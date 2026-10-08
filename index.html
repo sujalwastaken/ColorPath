@@ -1,245 +1,200 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gradient Path on HSV Color Wheel</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gradient Mixing — HSV Wheel</title>
 <style>
 *{box-sizing:border-box}
-body{
-  margin:0;background:#181818;color:#eee;font-family:system-ui,-apple-system,Segoe UI,sans-serif;
-  min-height:100vh;display:flex;justify-content:center
+body{margin:0;background:#171717;color:#eee;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.app{width:min(1100px,96vw);margin:auto;padding:24px}
+h1{font-size:22px;margin:0 0 4px}
+.subtitle{font-size:13px;color:#999;margin-bottom:18px}
+.layout{display:grid;grid-template-columns:minmax(420px,680px) 310px;gap:22px;align-items:start}
+.card{background:#222;border:1px solid #393939;border-radius:14px}
+.wheelCard{padding:16px;display:flex;justify-content:center}
+#wheel{display:block;width:min(100%,640px);height:auto;touch-action:none;cursor:crosshair}
+.wheelStage{position:relative;width:min(100%,640px)}
+.wheelPreview{
+  position:absolute;left:14px;top:14px;z-index:2;
+  display:grid;grid-template-columns:38px 1fr;gap:8px;align-items:center;
+  padding:8px 10px;background:rgba(25,25,25,.94);
+  border:1px solid #4a4a4a;border-radius:8px;
+  min-width:190px;pointer-events:none;
+  backdrop-filter:blur(5px)
 }
-.app{width:min(1100px,96vw);padding:24px}
-h1{font-size:22px;margin:0 0 5px}
-.sub{color:#aaa;font-size:13px;margin-bottom:20px}
-.layout{display:grid;grid-template-columns:minmax(420px,650px) 300px;gap:24px;align-items:start}
-.panel,.wheelbox{background:#222;border:1px solid #383838;border-radius:14px}
-.wheelbox{padding:18px;display:flex;justify-content:center}
-canvas{width:min(100%,620px);height:auto;display:block;cursor:crosshair;touch-action:none}
-#hoverInfo{display:flex;align-items:center;gap:9px}
-#hoverSwatch{width:30px;height:30px;border-radius:5px;border:1px solid #555;display:inline-block;flex:none}
-#copyState{color:#aaa}
-.canvaswrap{position:relative;width:100%;display:flex;justify-content:center}
-.hoverPreview{
-  position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:9px;
-  padding:7px 9px;background:rgba(20,20,20,.92);border:1px solid #555;border-radius:8px;
-  pointer-events:none;opacity:0;transition:opacity .08s;min-width:150px;font-size:11px;
-  box-shadow:0 4px 16px rgba(0,0,0,.35)
-}
-.hoverSwatch{width:28px;height:28px;border-radius:5px;border:1px solid #777;flex:none}
-.hoverPreview b{display:block;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}
-.hoverPreview span{display:block;color:#aaa;margin-top:2px}
-
-.panel{padding:18px}
-label{font-size:12px;color:#aaa;display:block;margin:0 0 7px}
-.row{display:flex;gap:8px;align-items:center;margin-bottom:16px}
-input[type=text],select,input[type=number]{
-  background:#151515;color:#eee;border:1px solid #444;border-radius:7px;padding:9px 10px;
-  font:inherit
-}
-input[type=text]{width:100%}
-input[type=color]{width:46px;height:38px;padding:2px;background:#151515;border:1px solid #444;border-radius:7px}
-select{width:100%}
-button{
-  background:#333;color:#eee;border:1px solid #555;border-radius:7px;padding:8px 12px;
-  cursor:pointer
-}
-button:hover{background:#444}
-.samples{width:100%}
+.wheelPreview .previewChip{width:36px;height:36px}
+.wheelPreview .previewHex{font-size:13px}
+.controls{padding:17px}
+label{display:block;font-size:11px;letter-spacing:.04em;color:#aaa;margin-bottom:7px}
+.row{display:flex;gap:8px;margin-bottom:14px}
+input[type=color]{width:48px;height:40px;padding:2px;border:1px solid #555;background:#151515;border-radius:7px}
+input[type=text],select{width:100%;height:40px;background:#151515;color:#eee;border:1px solid #484848;border-radius:7px;padding:8px 10px;font:inherit}
+select{cursor:pointer}
 input[type=range]{width:100%}
-.value{font-size:12px;color:#bbb;text-align:right}
-.swatchrow{display:flex;gap:8px;margin-top:8px}
-.swatch{height:34px;flex:1;border-radius:5px;border:1px solid #444}
-.info{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:#aaa;line-height:1.6;margin-top:12px}
-.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#aaa;margin-top:12px}
-.dot{width:9px;height:9px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:4px}
-.note{font-size:11px;color:#888;line-height:1.45;margin-top:16px}.copyhint{font-size:11px;color:#8f8;margin-top:5px;min-height:15px}
-@media(max-width:800px){.layout{grid-template-columns:1fr}.panel{order:-1}}
-
-.hoverPreview{
-  position:fixed;pointer-events:none;z-index:20;display:none;
-  min-width:150px;padding:9px 10px;border:1px solid #555;border-radius:8px;
-  background:#111;color:#eee;box-shadow:0 5px 18px rgba(0,0,0,.35);font-size:12px
-}
-.previewSwatch{height:24px;border-radius:4px;margin-bottom:6px;border:1px solid #555}
-.copyStatus{font-size:11px;color:#8fc7ff;margin-top:6px;min-height:14px}
-.bwRow{display:flex;align-items:center;justify-content:space-between;margin:15px 0}
-.bwRow label{margin:0}
-.switch{position:relative;width:46px;height:25px}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;inset:0;background:#444;border:1px solid #666;border-radius:20px;cursor:pointer}
-.slider:before{content:"";position:absolute;width:19px;height:19px;left:2px;top:2px;border-radius:50%;background:#eee;transition:.15s}
-.switch input:checked + .slider{background:#777}
-.switch input:checked + .slider:before{transform:translateX(20px)}
+.rangeValue{text-align:right;color:#aaa;font-size:11px;margin-top:3px}
+button{min-height:40px;border:1px solid #555;border-radius:7px;background:#303030;color:#eee;padding:8px 12px;cursor:pointer}
+button:hover{background:#3a3a3a}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.actions button{flex:1}
+.toggle{width:100%;margin-top:5px}
+.swatches{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.swatch{height:34px;border:1px solid #555;border-radius:6px}
+.preview{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center;margin-top:14px;padding:10px;background:#191919;border:1px solid #393939;border-radius:8px}
+.previewChip{width:42px;height:42px;border-radius:6px;border:1px solid #555;background:#333}
+.previewHex{font:600 14px ui-monospace,SFMono-Regular,Consolas,monospace}
+.previewMeta{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:#888;margin-top:3px}
+.previewHint{font-size:11px;color:#777;margin-top:3px}
+.info{font:11px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#aaa;margin-top:13px}
+.pathDescription{font-size:12px;line-height:1.5;color:#aaa;background:#191919;border:1px solid #393939;border-radius:8px;padding:10px}.note{font-size:11px;line-height:1.5;color:#888;margin-top:16px}
+.badge{display:inline-block;font-size:10px;color:#bbb;background:#303030;border:1px solid #444;border-radius:999px;padding:3px 7px;margin-top:8px}
+.copied{color:#9fda9f}
+@media(max-width:820px){.layout{grid-template-columns:1fr}.wheelCard{order:2}.controls{order:1}}
 </style>
 </head>
 <body>
-<div class="app">
-  <h1>Gradient Path on an HSV Color Wheel</h1>
-  <div class="sub">The wheel is HSV: angle = hue, radius = saturation. The plotted path is the sequence of intermediate colors produced by the selected mixing model. Drag either endpoint knob.</div>
+<main class="app">
+<h1>Gradient Mixing on an HSV Color Wheel</h1>
+<div class="subtitle">Hue is the angle, saturation is the distance from the center. Drag the endpoint knobs, hover for a preview, or click a point to copy its HEX code.</div>
 
-  <div class="layout">
-    <div class="wheelbox">
-      <div class="canvaswrap">
-        <canvas id="wheel" width="700" height="700"></canvas>
-        <div id="hoverPreview" class="hoverPreview">
-          <div id="hoverSwatch" class="hoverSwatch"></div>
-          <div>
-            <b id="hoverHex">#FFFFFF</b>
-            <span id="hoverHsv">H 0° · S 0% · V 100%</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <label>START COLOR</label>
-      <div class="row">
-        <input id="startColor" type="color" value="#ff0000">
-        <input id="startHex" type="text" value="#ff0000" spellcheck="false">
-      </div>
-
-      <label>END COLOR</label>
-      <div class="row">
-        <input id="endColor" type="color" value="#0000ff">
-        <input id="endHex" type="text" value="#0000ff" spellcheck="false">
-      </div>
-
-      <label>INTERPOLATION</label>
-      <select id="mode">
-        <option value="csp-perceptual">CSP-like Perceptual — vivid paint-oriented</option>
-        <option value="pigment">Pigment — subtractive paint approximation</option>
-        <option value="oklch-short">Perceptual — OKLCH hue path</option>
-        <option value="oklch-long">Perceptual — long hue path</option>
-        <option value="rgb">RGB — screen/light mixing</option>
-        <option value="hsv-short">HSV — shortest hue path</option>
-        <option value="hsv-long">HSV — longest hue path</option>
-        <option value="hsl-short">HSL — shortest hue path</option>
-        <option value="hsl-long">HSL — longest hue path</option>
-      </select>
-
-      <div class="bwRow">
-        <label for="bwToggle">BLACK &amp; WHITE WHEEL</label>
-        <span class="switch"><input id="bwToggle" type="checkbox"><span class="slider"></span></span>
-      </div>
-
-      <div style="height:4px"></div>
-      <label>SAMPLES</label>
-      <input id="samples" type="range" min="10" max="500" value="160">
-      <div class="value"><span id="samplesValue">160</span> points</div>
-
-      <div style="height:10px"></div>
-      <button id="swap" type="button">Swap colors</button>
-      <button id="bw" type="button">B/W</button>
-      <button id="reset" type="button">Reset</button>
-
-      <div class="swatchrow">
-        <div id="sw1" class="swatch"></div>
-        <div id="sw2" class="swatch"></div>
-      </div>
-
-      <div id="hoverPreview" style="display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px;background:#171717;border:1px solid #383838;border-radius:8px">
-        <div id="previewSwatch" style="width:42px;height:42px;border-radius:6px;border:1px solid #555;background:#fff"></div>
-        <div style="min-width:0">
-          <div style="font-size:11px;color:#888">HOVER / PICK</div>
-          <div id="previewHex" style="font:600 14px ui-monospace,SFMono-Regular,Consolas,monospace">#FFFFFF</div>
-          <div id="previewHsv" style="font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:#888">H 0° · S 0% · V 100%</div>
-        </div>
-        <button id="copyColor" type="button" style="margin-left:auto">Copy</button>
-      </div>
-
-      <div id="info" class="info"></div><div id="copyhint" class="copyhint"></div>
-
-      <div id="hoverInfo" class="info" style="min-height:42px;margin-top:14px">
-        <b>Hover:</b> move over the wheel to preview a color. Click to copy its HEX code.
-      </div>
-
-      <div class="legend">
-        <span><i class="dot" style="background:#fff"></i>path</span>
-        <span><i class="dot" style="background:#000;border:1px solid #777"></i>start</span>
-        <span><i class="dot" style="background:#fff;border:2px solid #000"></i>end</span>
-      </div>
-
-      <div class="note"><b>Hover</b> the wheel for a color preview. <b>Click</b> anywhere on the wheel to copy that color as HEX.<br><br><b>Drag the endpoint knobs</b> directly around the wheel to change the colors. The colored path is the actual sequence of intermediate colors for the selected mixing model.<br><br>
-        The main wheel is HSV: hue is the angle and saturation is the radius. OKLCH is only an optional interpolation model; it does not replace the HSV wheel.
-        Every point on the path is first generated by the selected interpolation method,
-        then converted to HSV and plotted at its actual hue/saturation coordinates.
-        This lets you compare how screen/RGB interpolation differs from perceptual and paint-oriented mixing. CSP itself distinguishes Standard and Perceptual gradient mixing; its Perceptual mode is designed to produce more realistic and vivid mixtures.
-      </div>
-    </div>
-  </div>
+<div class="layout">
+<section class="card wheelCard">
+<div class="wheelStage">
+<canvas id="wheel" width="700" height="700" aria-label="Interactive HSV color wheel"></canvas>
+<div class="wheelPreview" id="wheelPreview">
+<div id="previewChip" class="previewChip"></div>
+<div>
+<div id="previewHex" class="previewHex">Hover the wheel</div>
+<div id="previewMeta" class="previewMeta">H — · S — · V —</div>
+<div id="previewHint" class="previewHint">Click to copy HEX</div>
 </div>
-<div id="hoverPreview" class="hoverPreview"><div id="previewSwatch" class="previewSwatch"></div><div id="previewText"></div><div id="copyStatus" class="copyStatus"></div></div>
+</div>
+</div>
+</section>
+
+<section class="card controls">
+<label>START COLOR</label>
+<div class="row">
+<input id="startColor" type="color" value="#ff0000" aria-label="Start color">
+<input id="startHex" type="text" value="#ff0000" spellcheck="false" aria-label="Start HEX">
+</div>
+
+<label>END COLOR</label>
+<div class="row">
+<input id="endColor" type="color" value="#0000ff" aria-label="End color">
+<input id="endHex" type="text" value="#0000ff" spellcheck="false" aria-label="End HEX">
+</div>
+
+<label>PATH</label>
+<div class="pathDescription">
+  One hue/saturation path between the two endpoint colors. The curve stays near
+  the wheel edge for nearby hues and bends inward as the hue separation increases.
+</div>
+
+<div style="height:14px"></div>
+<label>SAMPLES</label>
+<input id="samples" type="range" min="20" max="500" value="180">
+<div class="rangeValue"><span id="samplesValue">180</span> plotted samples</div>
+
+<div style="height:14px"></div>
+<label>CENTER BRIGHTNESS</label>
+<input id="centerBrightness" type="range" min="0" max="100" value="50">
+<div class="rangeValue"><span id="centerBrightnessValue">50</span>%</div>
+
+<div class="actions">
+<button id="swap" type="button">Swap</button>
+<button id="reset" type="button">Reset</button>
+</div>
+<button id="bwToggle" class="toggle" type="button" aria-pressed="false">Black &amp; White Wheel: OFF</button>
+
+<div class="swatches">
+<div id="startSwatch" class="swatch"></div>
+<div id="endSwatch" class="swatch"></div>
+</div>
+
+<div id="info" class="info"></div>
+
+<div class="note">
+<b>Knobs:</b> the black/white outlined endpoint markers are draggable.<br>
+<b>Wheel preview:</b> follows your cursor inside the wheel panel. The small circle on the path shows the exact wheel color at that position.<br>
+<b>B&amp;W:</b> changes only the wheel's visual display to grayscale; color picking and the gradient still use the underlying HSV colors.
+<br><br>
+  Close hues follow the actual HSV wheel circle. Larger hue separations
+  gradually bend inward into a C-shaped path. The preview circle shows
+  the exact wheel color at the hovered point.
+  </div>
+  </section>
+</div>
+</main>
 
 <script>
-const canvas=document.getElementById("wheel"),ctx=canvas.getContext("2d");
-const startColor=document.getElementById("startColor"), endColor=document.getElementById("endColor");
-const startHex=document.getElementById("startHex"), endHex=document.getElementById("endHex");
-const mode=document.getElementById("mode"), samples=document.getElementById("samples");
-const samplesValue=document.getElementById("samplesValue"), info=document.getElementById("info");
-const sw1=document.getElementById("sw1"), sw2=document.getElementById("sw2");
-const bwToggle=document.getElementById("bwToggle");const bw=document.getElementById("bw");
-const previewSwatch=document.getElementById("previewSwatch");
-const previewHex=document.getElementById("previewHex");
-const previewHsv=document.getElementById("previewHsv");
-const copyColor=document.getElementById("copyColor");
-const bwToggle=document.getElementById("bwToggle");
-const hoverPreview=document.getElementById("hoverPreview");
-const previewSwatch=document.getElementById("previewSwatch");
-const previewText=document.getElementById("previewText");
-const copyStatus=document.getElementById("copyStatus");
+"use strict";
 
-function clamp(x,a=0,b=1){return Math.max(a,Math.min(b,x))}
-function lerp(a,b,t){return a+(b-a)*t}
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
 
-function hexToRgb(hex){
-  hex=hex.trim().replace("#","");
-  if(hex.length===3) hex=hex.split("").map(x=>x+x).join("");
-  if(!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
-  return {r:parseInt(hex.slice(0,2),16)/255,g:parseInt(hex.slice(2,4),16)/255,b:parseInt(hex.slice(4,6),16)/255};
+const startColor = document.getElementById("startColor");
+const endColor = document.getElementById("endColor");
+const startHex = document.getElementById("startHex");
+const endHex = document.getElementById("endHex");
+const samples = document.getElementById("samples");
+const samplesValue = document.getElementById("samplesValue");
+const centerBrightness = document.getElementById("centerBrightness");
+const centerBrightnessValue = document.getElementById("centerBrightnessValue");
+const bwToggle = document.getElementById("bwToggle");
+const startSwatch = document.getElementById("startSwatch");
+const endSwatch = document.getElementById("endSwatch");
+const previewChip = document.getElementById("previewChip");
+const previewHex = document.getElementById("previewHex");
+const previewMeta = document.getElementById("previewMeta");
+const previewHint = document.getElementById("previewHint");
+const info = document.getElementById("info");
+let bwWheel = false;
+let dragKnob = null;
+let movedDuringDrag = false;
+let suppressClick = false;
+
+function clamp(x, a=0, b=1) {
+  return Math.max(a, Math.min(b, x));
 }
-function rgbToHex(c){
-  return "#"+[c.r,c.g,c.b].map(x=>Math.round(clamp(x)*255).toString(16).padStart(2,"0")).join("");
+function lerp(a,b,t) {
+  return a + (b-a)*t;
+}
+function hexToRgb(hex) {
+  let s = String(hex).trim().replace("#","");
+  if (s.length === 3) s = s.split("").map(x=>x+x).join("");
+  if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+  return {
+    r: parseInt(s.slice(0,2),16)/255,
+    g: parseInt(s.slice(2,4),16)/255,
+    b: parseInt(s.slice(4,6),16)/255
+  };
+}
+function rgbToHex(c) {
+  return "#" + [c.r,c.g,c.b].map(v =>
+    Math.round(clamp(v)*255).toString(16).padStart(2,"0")
+  ).join("");
 }
 
-function rgbToHsv(c){
-  let r=c.r,g=c.g,b=c.b, max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
-  let h=0,s=max===0?0:d/max,v=max;
+function rgbToHsv(c) {
+  const r=c.r,g=c.g,b=c.b;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0;
+  const s=max===0 ? 0 : d/max;
+  const v=max;
   if(d!==0){
     if(max===r) h=((g-b)/d)%6;
     else if(max===g) h=(b-r)/d+2;
     else h=(r-g)/d+4;
-    h*=60;if(h<0)h+=360;
+    h*=60;
+    if(h<0) h+=360;
   }
   return {h,s,v};
 }
-function hsvToRgb(h,s,v){
+function hsvToRgb(h,s,v) {
   h=((h%360)+360)%360;
-  let c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c,r=0,g=0,b=0;
-  if(h<60)[r,g,b]=[c,x,0];
-  else if(h<120)[r,g,b]=[x,c,0];
-  else if(h<180)[r,g,b]=[0,c,x];
-  else if(h<240)[r,g,b]=[0,x,c];
-  else if(h<300)[r,g,b]=[x,0,c];
-  else [r,g,b]=[c,0,x];
-  return {r:r+m,g:g+m,b:b+m};
-}
-function rgbToHsl(c){
-  let r=c.r,g=c.g,b=c.b,max=Math.max(r,g,b),min=Math.min(r,g,b);
-  let h=0,s=0,l=(max+min)/2,d=max-min;
-  if(d){
-    s=d/(1-Math.abs(2*l-1));
-    if(max===r)h=((g-b)/d)%6;
-    else if(max===g)h=(b-r)/d+2;
-    else h=(r-g)/d+4;
-    h*=60;if(h<0)h+=360;
-  }
-  return {h,s,l};
-}
-function hslToRgb(h,s,l){
-  h=((h%360)+360)%360;
-  let c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2,r=0,g=0,b=0;
+  const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+  let r=0,g=0,b=0;
   if(h<60)[r,g,b]=[c,x,0];
   else if(h<120)[r,g,b]=[x,c,0];
   else if(h<180)[r,g,b]=[0,c,x];
@@ -249,546 +204,538 @@ function hslToRgb(h,s,l){
   return {r:r+m,g:g+m,b:b+m};
 }
 
-function hueLerp(a,b,t,longWay=false){
+/* Color interpolation used only for the movable path knob. */
+function hueLerp(a,b,t) {
   let d=((b-a+540)%360)-180;
-  if(longWay) d=d>0?d-360:d+360;
   return (a+d*t+360)%360;
 }
 
-// --- Mixing models ---------------------------------------------------------
-// "Standard" is channel/RGB mixing.
-// "Perceptual" uses OKLab interpolation. This is not CSP's proprietary
-// implementation, but it behaves much closer to paint-oriented perceptual
-// interpolation than raw RGB: mixtures retain chroma and avoid the muddy
-// middle produced by many RGB pairs.
-//
-// "Pigment" is a simple subtractive Kubelka-Munk-inspired approximation.
-// It converts RGB to approximate optical density, mixes that density, then
-// converts back. It is useful for seeing a paint-like trajectory rather than
-// a light/color-screen trajectory.
-
-function srgbToLinear(x){
-  return x<=0.04045 ? x/12.92 : Math.pow((x+0.055)/1.055,2.4);
-}
-function linearToSrgb(x){
-  x=Math.max(0,x);
-  return x<=0.0031308 ? 12.92*x : 1.055*Math.pow(x,1/2.4)-0.055;
-}
-function rgbToOklab(c){
-  let r=srgbToLinear(c.r),g=srgbToLinear(c.g),b=srgbToLinear(c.b);
-  let l=0.4122214708*r+0.5363325363*g+0.0514459929*b;
-  let m=0.2119034982*r+0.6806995451*g+0.1073969566*b;
-  let ss=0.0883024619*r+0.2817188376*g+0.6299787005*b;
-  l=Math.cbrt(l);m=Math.cbrt(m);ss=Math.cbrt(ss);
-  return {
-    L:0.2104542553*l+0.793617785*m-0.0040720468*ss,
-    a:1.9779984951*l-2.428592205*m+0.4505937099*ss,
-    b:0.0259040371*l+0.7827717662*m-0.808675766*ss
-  };
-}
-function oklabToRgb(x){
-  let l=Math.pow(x.L+0.3963377774*x.a+0.2158037573*x.b,3);
-  let m=Math.pow(x.L-0.1055613458*x.a-0.0638541728*x.b,3);
-  let ss=Math.pow(x.L-0.0894841775*x.a-1.291485548*x.b,3);
-  return {
-    r:clamp(linearToSrgb( 4.0767416621*l-3.3077115913*m+0.2309699292*ss)),
-    g:clamp(linearToSrgb(-1.2684380046*l+2.6097574011*m-0.3413193965*ss)),
-    b:clamp(linearToSrgb(-0.0041960863*l-0.7034186147*m+1.7076147010*ss))
-  };
-}
-function rgbToOklch(c){
-  let x=rgbToOklab(c);
-  return {L:x.L,C:Math.hypot(x.a,x.b),h:(Math.atan2(x.b,x.a)*180/Math.PI+360)%360};
-}
-function oklchToRgb(x){
-  let a=x.C*Math.cos(x.h*Math.PI/180),b=x.C*Math.sin(x.h*Math.PI/180);
-  return oklabToRgb({L:x.L,a,b});
-}
-
-function interpolateOKLCH(a,b,t,longWay=false){
-  let A=rgbToOklch(a),B=rgbToOklch(b);
-  let h=hueLerp(A.h,B.h,t,longWay);
-  // If one endpoint is effectively neutral, interpolate the hue from the
-  // other endpoint rather than letting the undefined hue spin unpredictably.
-  if(A.C<0.0005 && B.C>=0.0005) A.h=B.h;
-  if(B.C<0.0005 && A.C>=0.0005) B.h=A.h;
-  h=hueLerp(A.h,B.h,t,longWay);
-  return oklchToRgb({
-    L:lerp(A.L,B.L,t),
-    C:lerp(A.C,B.C,t),
-    h
-  });
-}
-
-// Approximate subtractive/pigment mixing.
-// Optical density is mixed in a perceptual-ish RGB basis. This deliberately
-// differs from RGB screen mixing and gives cyan+yellow -> green, etc.
-function pigmentMix(a,b,t){
-  // Practical subtractive/pigment approximation. CSP's exact Perceptual
-  // algorithm is proprietary, so this intentionally does not claim to be
-  // bit-for-bit identical.
-  const eps=1e-4;
-  const toD=v=>-Math.log(Math.max(v,eps));
-  const fromD=d=>Math.exp(-Math.max(0,d));
-
-  const r=fromD(lerp(toD(a.r),toD(b.r),t));
-  const g=fromD(lerp(toD(a.g),toD(b.g),t));
-  const bl=fromD(lerp(toD(a.b),toD(b.b),t));
-
-  // Correct the optical mixture toward the perceptual lightness expected
-  // between the endpoints. This avoids the extremely muddy midpoint that
-  // plain RGB/subtractive mixing can produce.
-  const raw={r,g,b:bl};
-  const A=rgbToOklab(a), B=rgbToOklab(b), M=rgbToOklab(raw);
-  const targetL=lerp(A.L,B.L,t);
-  const corrected={L:clamp(M.L+(targetL-M.L)*0.55),a:M.a,b:M.b};
-  const out=oklabToRgb(corrected);
-  return {r:clamp(out.r),g:clamp(out.g),b:clamp(out.b)};
-}
-
-function interpolate(a,b,t){
-  const m=mode.value;
-  if(m==="rgb") return {
-    r:lerp(a.r,b.r,t),g:lerp(a.g,b.g,t),b:lerp(a.b,b.b,t)
-  };
-  if(m==="oklab") return interpolateOKLCH(a,b,t,false);
-  if(m==="oklch-short") return interpolateOKLCH(a,b,t,false);
-  if(m==="oklch-long") return interpolateOKLCH(a,b,t,true);
-  if(m==="csp-perceptual") return cspPerceptualMix(a,b,t);
-  if(m==="pigment") return pigmentMix(a,b,t);
-  if(m==="hsv-short"||m==="hsv-long"){
-    let A=rgbToHsv(a),B=rgbToHsv(b),longWay=m==="hsv-long";
-    let h=hueLerp(A.h,B.h,t,longWay);
-    return hsvToRgb(h,lerp(A.s,B.s,t),lerp(A.v,B.v,t));
-  }
-  let A=rgbToHsl(a),B=rgbToHsl(b),longWay=m==="hsl-long";
-  let h=hueLerp(A.h,B.h,t,longWay);
-  return hslToRgb(h,lerp(A.s,B.s,t),lerp(A.l,B.l,t));
-}
-let savedColors={start:"#ff0000",end:"#0000ff"};
-let bwMode=false;
-
-function syncFromColor(){
-  startHex.value=startColor.value;
-  endHex.value=endColor.value;
-  if(!bwMode) savedColors={start:startColor.value,end:endColor.value};
-  draw();
-}
-function syncFromHex(input,colorInput){
-  let c=hexToRgb(input.value);
-  if(c){colorInput.value=rgbToHex(c);input.value=colorInput.value;draw();}
-  else input.style.borderColor="#c55";
-}
-startColor.addEventListener("input",syncFromColor);
-endColor.addEventListener("input",syncFromColor);
-startHex.addEventListener("change",()=>syncFromHex(startHex,startColor));
-endHex.addEventListener("change",()=>syncFromHex(endHex,endColor));
-mode.addEventListener("change",draw);
-bwToggle.addEventListener("change",draw);
-samples.addEventListener("input",()=>{samplesValue.textContent=samples.value;draw()});
-bw.addEventListener("change",draw);
-document.getElementById("swap").onclick=()=>{
-  let x=startColor.value;startColor.value=endColor.value;endColor.value=x;
-  startHex.value=startColor.value;endHex.value=endColor.value;
-  if(!bwMode) savedColors={start:startColor.value,end:endColor.value};
-  draw();
-};
-document.getElementById("bw").onclick=()=>{
-  if(!bwMode){
-    savedColors={start:startColor.value,end:endColor.value};
-    startColor.value="#000000";endColor.value="#ffffff";
-    startHex.value="#000000";endHex.value="#ffffff";
-    bwMode=true;
-    document.getElementById("bw").textContent="Color";
-  }else{
-    startColor.value=savedColors.start;endColor.value=savedColors.end;
-    startHex.value=startColor.value;endHex.value=endColor.value;
-    bwMode=false;
-    document.getElementById("bw").textContent="B/W";
-  }
-  draw();
-};
-document.getElementById("reset").onclick=()=>{
-  startColor.value="#ff0000";endColor.value="#0000ff";mode.value="rgb";
-  samples.value=160;samplesValue.textContent=160;bwMode=false;
-  document.getElementById("bw").textContent="B/W";
-  savedColors={start:"#ff0000",end:"#0000ff"};
-  syncFromColor();
-};
-
-let bwWheel=false;
-function luminance(c){
-  return clamp(0.2126*c.r+0.7152*c.g+0.0722*c.b);
-}
-
-function drawWheel(cx,cy,R){
-  const img=ctx.createImageData(Math.ceil(R*2),Math.ceil(R*2));
-  const data=img.data;
-  const bw=document.getElementById("bwToggle").checked;
-
-  for(let y=0;y<img.height;y++){
-    for(let x=0;x<img.width;x++){
-      const dx=x-R+.5,dy=y-R+.5,rr=Math.sqrt(dx*dx+dy*dy);
-      const i=(y*img.width+x)*4;
-      if(rr>R){data[i+3]=0;continue}
-      const sat=rr/R;
-      const h=(Math.atan2(dx,-dy)*180/Math.PI+360)%360;
-      let c=hsvToRgb(h,sat,1);
-      if(bw){const q=luminance(c);c={r:q,g:q,b:q}}
-      data[i]=c.r*255;data[i+1]=c.g*255;data[i+2]=c.b*255;data[i+3]=255;
-    }
-  }
-  ctx.putImageData(img,cx-R,cy-R);
-
-  ctx.strokeStyle="rgba(255,255,255,.3)";
-  ctx.lineWidth=1;
-  ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.stroke();
-
-  ctx.font="12px system-ui";
-  [[0,"RED"],[60,"YELLOW"],[120,"GREEN"],[180,"CYAN"],[240,"BLUE"],[300,"MAGENTA"]].forEach(([h,t])=>{
-    const a=h*Math.PI/180-Math.PI/2;
-    const x=cx+Math.cos(a)*(R+22),y=cy+Math.sin(a)*(R+22);
-    ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.fillStyle="rgba(255,255,255,.75)";
-    ctx.fillText(t,x,y);
-  });
-}
-
-function pointFor(c,cx,cy,R){
-  let h=rgbToHsv(c);
-  let a=h.h*Math.PI/180-Math.PI/2;
-  return {x:cx+Math.cos(a)*h.s*R,y:cy+Math.sin(a)*h.s*R,h,s:h.s,v:h.v};
-}
-
-function draw(){
-  const dpr=devicePixelRatio||1;
-  const rect=canvas.getBoundingClientRect();
-  if(!rect.width || !rect.height) return;
-  if(canvas.width!==Math.round(rect.width*dpr)){canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.width*dpr)}
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  const W=rect.width,H=rect.width,cx=W/2,cy=H/2,R=W*.36;
-  ctx.clearRect(0,0,W,H);
-  drawWheel(cx,cy,R);
-
-  let a=hexToRgb(startColor.value),b=hexToRgb(endColor.value);
-  if(!a||!b)return;
-
-  const n=+samples.value;
-  let pts=[];
-  for(let i=0;i<n;i++)pts.push(pointFor(interpolate(a,b,i/(n-1)),cx,cy,R));
-
-  // Soft glow under the trajectory
-  ctx.lineCap="round";ctx.lineJoin="round";
-  ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
-  ctx.strokeStyle="rgba(0,0,0,.75)";ctx.lineWidth=7;ctx.stroke();
-
-  // Draw path using each segment's actual color.
-  for(let i=1;i<pts.length;i++){
-    let t=i/(pts.length-1),c=interpolate(a,b,t);
-    if(document.getElementById("bwToggle").checked){
-      const q=luminance(c);c={r:q,g:q,b:q};
-    }
-    ctx.beginPath();ctx.moveTo(pts[i-1].x,pts[i-1].y);ctx.lineTo(pts[i].x,pts[i].y);
-    ctx.strokeStyle=rgbToHex(c);ctx.lineWidth=3;ctx.stroke();
-  }
-
-  // Sample dots
-  for(let i=0;i<pts.length;i+=Math.max(1,Math.floor(n/70))){
-    let p=pts[i],c=interpolate(a,b,i/(n-1));
-    ctx.beginPath();ctx.arc(p.x,p.y,2.1,0,Math.PI*2);
-    ctx.fillStyle=rgbToHex(c);ctx.fill();
-  }
-
-  // endpoints
-  let p1=pts[0],p2=pts[pts.length-1];
-  ctx.beginPath();ctx.arc(p1.x,p1.y,7,0,Math.PI*2);ctx.fillStyle="#000";ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
-  ctx.beginPath();ctx.arc(p2.x,p2.y,7,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#000";ctx.lineWidth=2;ctx.stroke();
-
-  let displayA=startColor.value,displayB=endColor.value;
-  if(bwToggle.checked){
-    const da=hexToRgb(displayA),db=hexToRgb(displayB);
-    const qa=luminance(da),qb=luminance(db);
-    displayA=rgbToHex({r:qa,g:qa,b:qa});
-    displayB=rgbToHex({r:qb,g:qb,b:qb});
-  }
-  sw1.style.background=displayA;sw2.style.background=displayB;
-  let A=rgbToHsv(a),B=rgbToHsv(b);
-  info.innerHTML=
-    `START&nbsp; ${startColor.value.toUpperCase()} &nbsp; H ${A.h.toFixed(1)}° S ${(A.s*100).toFixed(1)}% V ${(A.v*100).toFixed(1)}%<br>`+
-    `END&nbsp;&nbsp;&nbsp; ${endColor.value.toUpperCase()} &nbsp; H ${B.h.toFixed(1)}° S ${(B.s*100).toFixed(1)}% V ${(B.v*100).toFixed(1)}%`;
-}
-
-
-// --- Hover color preview + click-to-copy -----------------------------------
-const hoverPreview=document.getElementById("hoverPreview");
-const hoverSwatch=document.getElementById("hoverSwatch");
-const hoverHex=document.getElementById("hoverHex");
-const hoverHsv=document.getElementById("hoverHsv");
-
-function wheelColorAt(x,y){
-  const g=wheelGeometry(),dx=x-g.cx,dy=y-g.cy;
-  const rr=Math.hypot(dx,dy);
-  if(rr>g.R) return null;
-  const sat=clamp(rr/g.R);
+function pathColorAtPoint(p) {
+  const g=geometry();
+  const dx=p.x-g.cx;
+  const dy=p.y-g.cy;
+  const radius=Math.hypot(dx,dy);
+  const s=clamp(radius/g.R);
   const h=(Math.atan2(dx,-dy)*180/Math.PI+360)%360;
-  // The wheel itself is V=1, so the hover color is unambiguous.
-  return hsvToRgb(h,sat,1);
-}
-function showHoverColor(c){
-  const h=rgbToHsv(c),hex=rgbToHex(c);
-  hoverSwatch.style.background=hex;
-  hoverHex.textContent=hex.toUpperCase();
-  hoverHsv.textContent=`H ${h.h.toFixed(1)}° · S ${(h.s*100).toFixed(1)}% · V ${(h.v*100).toFixed(1)}%`;
-  hoverPreview.style.opacity="1";
-}
-canvas.addEventListener("pointermove",e=>{
-  if(dragKnob) return;
-  const p=canvasPoint(e),c=wheelColorAt(p.x,p.y);
-  if(c) showHoverColor(c);
-  else hoverPreview.style.opacity="0";
-});
-canvas.addEventListener("pointerleave",()=>{hoverPreview.style.opacity="0"});
-canvas.addEventListener("click",async e=>{
-  if(dragKnob || wasDragged){wasDragged=false;return;}
-  const p=canvasPoint(e),c=wheelColorAt(p.x,p.y);
-  if(!c) return;
-  const hex=rgbToHex(c);
-  showHoverColor(c);
-  try{
-    await navigator.clipboard.writeText(hex.toUpperCase());
-    hoverHex.textContent=hex.toUpperCase()+"  ✓ COPIED";
-    setTimeout(()=>showHoverColor(c),900);
-  }catch(err){
-    // Clipboard permission can be unavailable for local file:// pages.
-    hoverHex.textContent=hex.toUpperCase();
-  }
-});
 
-// --- Hover preview + click-to-copy ----------------------------------------
-const hoverInfo=document.getElementById("hoverInfo");
-const bwToggle=document.getElementById("bwToggle");
+  // This is exactly the same HSV -> RGB rule used by the wheel.
+  // V matches the wheel: grey at the centre, full brightness at the rim.
+  const centerV=Number(centerBrightness.value)/100;
+       const v=centerV+(1-centerV)*s;
+  return hsvToRgb(h,s,v);
+}
 
-function hsvAtCanvasPoint(x,y){
-  const g=wheelGeometry(),dx=x-g.cx,dy=y-g.cy;
-  const rr=Math.hypot(dx,dy);
-  if(rr>g.R)return null;
-  const sat=clamp(rr/g.R);
-  const h=(Math.atan2(dx,-dy)*180/Math.PI+360)%360;
-  return {h,s:sat,v:1,rgb:hsvToRgb(h,sat,1)};
+function geometry() {
+  const r=canvas.getBoundingClientRect();
+  return {w:r.width,cx:r.width/2,cy:r.height/2,R:Math.min(r.width,r.height)*0.36};
 }
-function showHoverColor(p){
-  const hex=rgbToHex(p.rgb).toUpperCase();
-  const displayRgb=`rgb(${Math.round(p.rgb.r*255)}, ${Math.round(p.rgb.g*255)}, ${Math.round(p.rgb.b*255)})`;
-  hoverInfo.innerHTML=
-    `<span id="hoverSwatch" style="background:${hex}"></span>`+
-    `<span><b>${hex}</b><br><span id="copyState">${displayRgb} · H ${p.h.toFixed(1)}° · S ${(p.s*100).toFixed(1)}%</span></span>`;
-}
-function copyText(text){
-  // Clipboard API may be unavailable for file:// pages, so keep a fallback.
-  if(navigator.clipboard && window.isSecureContext){
-    return navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));
-  }
-  return fallbackCopy(text);
-}
-function fallbackCopy(text){
-  const ta=document.createElement("textarea");
-  ta.value=text;ta.style.position="fixed";ta.style.left="-9999px";
-  document.body.appendChild(ta);ta.focus();ta.select();
-  let ok=false;
-  try{ok=document.execCommand("copy")}catch(e){}
-  ta.remove();
-  return Promise.resolve(ok);
-}
-canvas.addEventListener("pointermove",e=>{
-  if(dragKnob)return;
-  const p0=canvasPoint(e),p=hsvAtCanvasPoint(p0.x,p0.y);
-  if(p) showHoverColor(p);
-  else hoverInfo.innerHTML="<b>Hover:</b> move over the wheel to preview a color. Click to copy its HEX code.";
-});
-canvas.addEventListener("pointerleave",()=>{
-  if(!dragKnob) hoverInfo.innerHTML="<b>Hover:</b> move over the wheel to preview a color. Click to copy its HEX code.";
-});
-canvas.addEventListener("click",e=>{
-  if(dragKnob)return;
-  const p0=canvasPoint(e),p=hsvAtCanvasPoint(p0.x,p0.y);
-  if(!p)return;
-  const hex=rgbToHex(p.rgb).toUpperCase();
-  copyText(hex).then(()=>{
-    const sw=hoverInfo.querySelector("#copyState");
-    if(sw)sw.textContent=`Copied ${hex} to clipboard`;
-  });
-});
-bwToggle.addEventListener("click",()=>{
-  bwWheel=!bwWheel;
-  bwToggle.textContent=`B&W wheel: ${bwWheel?"ON":"OFF"}`;
-  draw();
-});
-
-// --- Draggable endpoint knobs ----------------------------------------------
-let dragKnob=null, didDrag=false;
-let wasDragged=false;
-function canvasPoint(e){
+function canvasPoint(e) {
   const r=canvas.getBoundingClientRect();
   return {x:e.clientX-r.left,y:e.clientY-r.top};
 }
-function wheelGeometry(){
-  const r=canvas.getBoundingClientRect();
-  return {W:r.width,cx:r.width/2,cy:r.width/2,R:r.width*.36};
-}
-function knobPosition(color,g){
-  const q=pointFor(color,g.cx,g.cy,g.R);
-  return q;
-}
-function wheelColorAt(x,y){
-  const g=wheelGeometry(),dx=x-g.cx,dy=y-g.cy;
+function wheelColorAt(x,y) {
+  const g=geometry(),dx=x-g.cx,dy=y-g.cy;
   const radius=Math.hypot(dx,dy);
   if(radius>g.R) return null;
-  const sat=clamp(radius/g.R);
+  const s=clamp(radius/g.R);
   const h=(Math.atan2(dx,-dy)*180/Math.PI+360)%360;
-  return {rgb:hsvToRgb(h,sat,1),h,s:sat,v:1};
+  return {rgb:hsvToRgb(h,s,1),h,s,v:1};
 }
-function updatePreview(x,y){
-  const q=wheelColorAt(x,y);
-  if(!q){
-    previewHex.textContent="—";
-    previewHsv.textContent="Outside wheel";
-    previewSwatch.style.background="#333";
-    return null;
-  }
-  const hex=rgbToHex(q.rgb).toUpperCase();
-  previewHex.textContent=hex;
-  previewHsv.textContent=`H ${q.h.toFixed(1)}° · S ${(q.s*100).toFixed(1)}% · V 100%`;
-  previewSwatch.style.background=hex;
-  return q;
-}
-function setColorFromWheelPoint(which,x,y){
-  const q=updatePreview(x,y);
-  if(!q)return;
-  const hex=rgbToHex(q.rgb);
-  if(which==="start"){startColor.value=hex;startHex.value=hex}
-  else {endColor.value=hex;endHex.value=hex}
-  draw();
+function wheelPoint(c) {
+  const g=geometry(),hsv=rgbToHsv(c);
+  const a=hsv.h*Math.PI/180-Math.PI/2;
+  return {
+    x:g.cx+Math.cos(a)*hsv.s*g.R,
+    y:g.cy+Math.sin(a)*hsv.s*g.R
+  };
 }
 
-canvas.addEventListener("pointermove",e=>{
-  const p=canvasPoint(e);
-  if(!dragKnob) updatePreview(p.x,p.y);
-});
-canvas.addEventListener("pointerleave",()=>{
-  previewHex.textContent="—";
-  previewHsv.textContent="Move over the wheel";
-  previewSwatch.style.background="#333";
-});
-canvas.addEventListener("click",e=>{
-  if(dragKnob)return;
-  const p=canvasPoint(e),q=wheelColorAt(p.x,p.y);
-  if(!q)return;
-  const hex=rgbToHex(q.rgb);
-  if(e.shiftKey){
-    endColor.value=hex;endHex.value=hex;
-  }else{
+function drawWheel() {
+  const g=geometry();
+  const dpr=window.devicePixelRatio||1;
+  const px=Math.max(1,Math.round(g.w*dpr));
+  if(canvas.width!==px || canvas.height!==px) {
+    canvas.width=px;canvas.height=px;
+  }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,g.w,g.w);
+
+  const size=Math.ceil(g.R*2);
+  const image=ctx.createImageData(size,size);
+
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      const dx=x-g.R+.5,dy=y-g.R+.5;
+      const rr=Math.hypot(dx,dy);
+      const i=(y*size+x)*4;
+      if(rr>g.R){image.data[i+3]=0;continue}
+      const s=rr/g.R;
+      const h=(Math.atan2(dx,-dy)*180/Math.PI+360)%360;
+      const centerV=Number(centerBrightness.value)/100;
+       const v=centerV+(1-centerV)*s;
+      const c=hsvToRgb(h,s,v);
+
+      if(bwWheel) {
+        const lum=0.2126*c.r+0.7152*c.g+0.0722*c.b;
+        image.data[i]=lum*255;
+        image.data[i+1]=lum*255;
+        image.data[i+2]=lum*255;
+      } else {
+        image.data[i]=c.r*255;
+        image.data[i+1]=c.g*255;
+        image.data[i+2]=c.b*255;
+      }
+      image.data[i+3]=255;
+    }
+  }
+  ctx.putImageData(image,g.cx-g.R,g.cy-g.R);
+
+  ctx.strokeStyle="rgba(255,255,255,.32)";
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(g.cx,g.cy,g.R,0,Math.PI*2);ctx.stroke();
+
+  ctx.font="11px system-ui";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.fillStyle="rgba(255,255,255,.78)";
+  [[0,"RED"],[60,"YELLOW"],[120,"GREEN"],[180,"CYAN"],[240,"BLUE"],[300,"MAGENTA"]]
+  .forEach(([h,label])=>{
+    const a=h*Math.PI/180-Math.PI/2;
+    ctx.fillText(label,g.cx+Math.cos(a)*(g.R+20),g.cy+Math.sin(a)*(g.R+20));
+  });
+}
+
+function curveGeometry(a,b) {
+  const g=geometry();
+  const A=rgbToHsv(a),B=rgbToHsv(b);
+
+  let dh=((B.h-A.h+540)%360)-180;
+  const absDh=Math.abs(dh);
+
+  const a1=A.h*Math.PI/180-Math.PI/2;
+  const a2=B.h*Math.PI/180-Math.PI/2;
+
+  const r1=A.s*g.R;
+  const r2=B.s*g.R;
+
+  const p0={
+    x:g.cx+Math.cos(a1)*r1,
+    y:g.cy+Math.sin(a1)*r1
+  };
+
+  const p2={
+    x:g.cx+Math.cos(a2)*r2,
+    y:g.cy+Math.sin(a2)*r2
+  };
+
+  /*
+    CLOSE COLORS:
+    Use a real circle, not a Bézier approximation.
+
+    This is exactly the same circular direction as the HSV wheel.
+    We only use the circle when the endpoint radii are effectively equal.
+  */
+  const sameRadius=Math.abs(r1-r2) < g.R*0.025;
+
+  if(absDh <= 35 && sameRadius) {
+    const midH=(A.h+dh*0.5+360)%360;
+    const am=midH*Math.PI/180-Math.PI/2;
+
+    return {
+      type:"arc",
+      p0,p2,
+      cx:g.cx,
+      cy:g.cy,
+      radius:(r1+r2)*0.5,
+      startAngle:a1,
+      endAngle:a1+dh*Math.PI/180,
+      midAngle:am,
+      A,B,dh,absDh
+    };
+  }
+
+  /*
+    FARTHER COLORS:
+    Use the inward C-shaped quadratic.
+    The control point never crosses the centre.
+  */
+  const midH=(A.h+dh*0.5+360)%360;
+  const am=midH*Math.PI/180-Math.PI/2;
+
+  const meanR=Math.max((r1+r2)*0.5,1);
+  const halfAngle=Math.min(absDh,170)*Math.PI/360;
+
+  const circularRadius=meanR/
+    Math.max(Math.cos(halfAngle),0.18);
+
+  // Start transitioning after the close-circle region.
+  const bend=clamp((absDh-18)/92);
+  const inwardRadius=g.R*0.025;
+
+  const controlRadius=lerp(circularRadius,inwardRadius,bend);
+
+  const control={
+    x:g.cx+Math.cos(am)*controlRadius,
+    y:g.cy+Math.sin(am)*controlRadius
+  };
+
+  return {
+    type:"bezier",
+    p0,p2,control,
+    A,B,dh,absDh
+  };
+}
+
+function bezierPoint(curve,t) {
+  if(curve.type==="arc") {
+    const angle=curve.startAngle+
+      (curve.endAngle-curve.startAngle)*t;
+
+    return {
+      x:curve.cx+Math.cos(angle)*curve.radius,
+      y:curve.cy+Math.sin(angle)*curve.radius
+    };
+  }
+
+  const u=1-t;
+  return {
+    x:u*u*curve.p0.x+
+      2*u*t*curve.control.x+
+      t*t*curve.p2.x,
+
+    y:u*u*curve.p0.y+
+      2*u*t*curve.control.y+
+      t*t*curve.p2.y
+  };
+}
+
+let pathPreview = null;
+
+function nearestPathPoint(x,y,curve) {
+  let bestT=0;
+  let bestD=Infinity;
+  const steps=300;
+
+  for(let i=0;i<=steps;i++) {
+    const t=i/steps;
+    const p=bezierPoint(curve,t);
+    const d=(p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
+    if(d<bestD) {
+      bestD=d;
+      bestT=t;
+    }
+  }
+
+  return {t:bestT,point:bezierPoint(curve,bestT),distance:Math.sqrt(bestD)};
+}
+
+function drawPathPreview() {
+  if(!pathPreview)return;
+
+  const a=hexToRgb(startColor.value);
+  const b=hexToRgb(endColor.value);
+  if(!a||!b)return;
+
+  const curve=curveGeometry(a,b);
+  const hit=nearestPathPoint(pathPreview.x,pathPreview.y,curve);
+
+  // Only show the preview circle when the cursor is reasonably close
+  // to the actual gradient line.
+  if(hit.distance>16)return;
+
+  const c=pathColorAtPoint(hit.point);
+
+  ctx.beginPath();
+  ctx.arc(hit.point.x,hit.point.y,10,0,Math.PI*2);
+  ctx.fillStyle=rgbToHex(c);
+  ctx.fill();
+
+  ctx.strokeStyle="#111";
+  ctx.lineWidth=2.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(hit.point.x,hit.point.y,6,0,Math.PI*2);
+  ctx.strokeStyle="rgba(255,255,255,.85)";
+  ctx.lineWidth=1;
+  ctx.stroke();
+}
+
+function drawPath() {
+  const a=hexToRgb(startColor.value),b=hexToRgb(endColor.value);
+  if(!a||!b)return;
+
+  const n=Number(samples.value);
+  const curve=curveGeometry(a,b);
+  const pts=[];
+
+  for(let i=0;i<n;i++) {
+    const t=n===1?0:i/(n-1);
+    const p=bezierPoint(curve,t);
+
+    // The path color is literally the color of the wheel at that point.
+    const color=pathColorAtPoint(p);
+    pts.push({x:p.x,y:p.y,color,t});
+  }
+
+  ctx.save();
+  ctx.lineJoin="round";
+  ctx.lineCap="round";
+
+  // One continuous dark outline.
+  ctx.beginPath();
+
+  if(curve.type==="arc") {
+    ctx.arc(
+      curve.cx,
+      curve.cy,
+      curve.radius,
+      curve.startAngle,
+      curve.endAngle,
+      curve.dh<0
+    );
+  } else {
+    ctx.moveTo(curve.p0.x,curve.p0.y);
+    ctx.quadraticCurveTo(
+      curve.control.x,curve.control.y,
+      curve.p2.x,curve.p2.y
+    );
+  }
+
+  ctx.strokeStyle="rgba(0,0,0,.85)";
+  ctx.lineWidth=8;
+  ctx.stroke();
+
+  // Color the exact same geometric path with wheel colors.
+  for(let i=1;i<pts.length;i++) {
+    ctx.beginPath();
+    ctx.moveTo(pts[i-1].x,pts[i-1].y);
+    ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.strokeStyle=rgbToHex(pts[i].color);
+    ctx.lineWidth=3;
+    ctx.stroke();
+  }
+
+  // Endpoint markers.
+  drawKnob(pts[0],true);
+  drawKnob(pts[pts.length-1],false);
+
+  ctx.restore();
+
+  // Preview circle.
+  drawPathPreview();
+
+  startSwatch.style.background=startColor.value;
+  endSwatch.style.background=endColor.value;
+
+  const A=rgbToHsv(a),B=rgbToHsv(b);
+  info.innerHTML=
+    `START ${startColor.value.toUpperCase()}  H ${A.h.toFixed(1)}° S ${(A.s*100).toFixed(1)}% V ${(A.v*100).toFixed(1)}%<br>`+
+    `END   ${endColor.value.toUpperCase()}  H ${B.h.toFixed(1)}° S ${(B.s*100).toFixed(1)}% V ${(B.v*100).toFixed(1)}%`;
+}
+
+
+function drawKnob(p,isStart) {
+  const c=isStart
+    ? hexToRgb(startColor.value)
+    : hexToRgb(endColor.value);
+
+  const hex=c ? rgbToHex(c) : "#888";
+
+  // Fill the knob with its actual endpoint color.
+  ctx.beginPath();
+  ctx.arc(p.x,p.y,9,0,Math.PI*2);
+  ctx.fillStyle=hex;
+  ctx.fill();
+
+  // Keep a strong contrasting outline so the knob is always visible.
+  const hsv=c ? rgbToHsv(c) : {v:0.5};
+  ctx.strokeStyle=hsv.v>0.65 ? "#111" : "#fff";
+  ctx.lineWidth=2.5;
+  ctx.stroke();
+
+  // Small inner highlight.
+  ctx.beginPath();
+  ctx.arc(p.x,p.y,5.5,0,Math.PI*2);
+  ctx.strokeStyle="rgba(255,255,255,.65)";
+  ctx.lineWidth=1;
+  ctx.stroke();
+}
+function draw() {
+  drawWheel();
+  drawPath();
+}
+
+function showPreview(c) {
+  if(!c) {
+    previewChip.style.background="#333";
+    previewHex.textContent="Hover the wheel";
+    previewMeta.textContent="H — · S — · V —";
+    previewHint.textContent="Click to copy HEX";
+    return;
+  }
+  const hex=rgbToHex(c.rgb).toUpperCase();
+  previewChip.style.background=hex;
+  previewHex.textContent=hex;
+  previewMeta.textContent=`H ${c.h.toFixed(1)}° · S ${(c.s*100).toFixed(1)}% · V ${(c.v*100).toFixed(1)}%`;
+  previewHint.textContent="Click to copy HEX";
+}
+
+function fallbackCopy(text) {
+  const ta=document.createElement("textarea");
+  ta.value=text;
+  ta.style.position="fixed";ta.style.left="-9999px";ta.style.top="0";
+  document.body.appendChild(ta);
+  ta.focus();ta.select();
+  let ok=false;
+  try{ok=document.execCommand("copy")}catch(e){}
+  ta.remove();
+  return ok;
+}
+async function copyText(text) {
+  if(navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch(e) {}
+  }
+  return fallbackCopy(text);
+}
+
+function setEndpointFromWheel(which,x,y) {
+  const c=wheelColorAt(x,y);
+  if(!c)return;
+  const hex=rgbToHex(c.rgb);
+  if(which==="start") {
     startColor.value=hex;startHex.value=hex;
+  } else {
+    endColor.value=hex;endHex.value=hex;
   }
-  updatePreview(p.x,p.y);
   draw();
-});
-copyColor.addEventListener("click",async()=>{
-  const hex=previewHex.textContent;
-  if(!/^#[0-9A-F]{6}$/.test(hex))return;
-  try{
-    await navigator.clipboard.writeText(hex);
-    copyColor.textContent="Copied!";
-    setTimeout(()=>copyColor.textContent="Copy",900);
-  }catch{
-    // Clipboard API may be unavailable for local file:// documents.
-    const ta=document.createElement("textarea");
-    ta.value=hex;ta.style.position="fixed";ta.style.opacity="0";
-    document.body.appendChild(ta);ta.select();
-    try{document.execCommand("copy");copyColor.textContent="Copied!";}
-    catch{copyColor.textContent="Select & copy";}
-    ta.remove();setTimeout(()=>copyColor.textContent="Copy",900);
-  }
-});
+  showPreview(c);
+}
+
+function endpointDistance(x,y,c) {
+  const p=wheelPoint(c);
+  return Math.hypot(x-p.x,y-p.y);
+}
+
 
 canvas.addEventListener("pointerdown",e=>{
-  const p=canvasPoint(e),g=wheelGeometry();
+  const p=canvasPoint(e);
   const a=hexToRgb(startColor.value),b=hexToRgb(endColor.value);
-  const p1=knobPosition(a,g),p2=knobPosition(b,g);
-  const d1=Math.hypot(p.x-p1.x,p.y-p1.y),d2=Math.hypot(p.x-p2.x,p.y-p2.y);
-  if(Math.min(d1,d2)<18){
-    dragKnob=d1<=d2?"start":"end";
-    didDrag=false;
-    wasDragged=false;
+  const da=endpointDistance(p.x,p.y,a),db=endpointDistance(p.x,p.y,b);
+  if(Math.min(da,db)<=18) {
+    dragKnob=da<=db?"start":"end";
+    movedDuringDrag=false;
     canvas.setPointerCapture(e.pointerId);
     canvas.style.cursor="grabbing";
     e.preventDefault();
   }
 });
+
 canvas.addEventListener("pointermove",e=>{
-  if(!dragKnob){
-    const p=canvasPoint(e),g=wheelGeometry();
-    const a=hexToRgb(startColor.value),b=hexToRgb(endColor.value);
-    const near=Math.min(Math.hypot(p.x-knobPosition(a,g).x,p.y-knobPosition(a,g).y),
-                        Math.hypot(p.x-knobPosition(b,g).x,p.y-knobPosition(b,g).y));
-    canvas.style.cursor=near<18?"grab":"crosshair";
+  const p=canvasPoint(e);
+  if(dragKnob) {
+    const g=geometry();
+    let dx=p.x-g.cx,dy=p.y-g.cy,rr=Math.hypot(dx,dy);
+    if(rr>g.R){const k=g.R/rr;dx*=k;dy*=k}
+    setEndpointFromWheel(dragKnob,g.cx+dx,g.cy+dy);
+    movedDuringDrag=true;
     return;
   }
-  const p=canvasPoint(e),g=wheelGeometry();
-  let dx=p.x-g.cx,dy=p.y-g.cy;
-  if(Math.hypot(dx,dy)>g.R){
-    const k=g.R/Math.hypot(dx,dy);dx*=k;dy*=k;
+
+  const a=hexToRgb(startColor.value),b=hexToRgb(endColor.value);
+  const near=Math.min(endpointDistance(p.x,p.y,a),endpointDistance(p.x,p.y,b));
+  canvas.style.cursor=near<=18 ? "grab" : "crosshair";
+
+  pathPreview={x:p.x,y:p.y};
+  draw();
+
+  // Keep the normal wheel color preview as well.
+  showPreview(wheelColorAt(p.x,p.y));
+});
+canvas.addEventListener("pointerleave",()=>{
+  if(!dragKnob) {
+    pathPreview=null;
+    showPreview(null);
+    draw();
   }
-  wasDragged=true;
-  didDrag=true;
-  setColorFromWheelPoint(dragKnob,g.cx+dx,g.cy+dy);
 });
 canvas.addEventListener("pointerup",e=>{
-  dragKnob=null;canvas.style.cursor="crosshair";
-});
-canvas.addEventListener("pointercancel",e=>{
-  dragKnob=null;canvas.style.cursor="crosshair";
-});
-
-
-function colorAtCanvasPoint(x,y){
-  const g=wheelGeometry(),dx=x-g.cx,dy=y-g.cy;
-  const radius=Math.hypot(dx,dy);
-  if(radius>g.R) return null;
-  const sat=clamp(radius/g.R);
-  const h=(Math.atan2(dx,-dy)*180/Math.PI+360)%360;
-  return hsvToRgb(h,sat,1);
-}
-function showPreview(e,c){
-  const hex=rgbToHex(c).toUpperCase(), hsv=rgbToHsv(c);
-  previewSwatch.style.background=hex;
-  previewText.innerHTML=`<b>${hex}</b><br>RGB ${Math.round(c.r*255)}, ${Math.round(c.g*255)}, ${Math.round(c.b*255)}<br>HSV ${hsv.h.toFixed(1)}°, ${(hsv.s*100).toFixed(1)}%, ${(hsv.v*100).toFixed(1)}%`;
-  copyStatus.textContent="Click to copy HEX";
-  hoverPreview.style.display="block";
-  const gap=14;
-  let left=e.clientX+gap,top=e.clientY+gap;
-  if(left+170>innerWidth)left=e.clientX-180;
-  if(top+120>innerHeight)top=e.clientY-130;
-  hoverPreview.style.left=left+"px";hoverPreview.style.top=top+"px";
-}
-canvas.addEventListener("pointermove",e=>{
-  if(dragKnob)return;
-  const p=canvasPoint(e),c=colorAtCanvasPoint(p.x,p.y);
-  if(c)showPreview(e,c);else hoverPreview.style.display="none";
-});
-canvas.addEventListener("pointerleave",()=>{hoverPreview.style.display="none"});
-canvas.addEventListener("click",async e=>{
-  if(didDrag){didDrag=false;return;}
-  const p=canvasPoint(e),c=colorAtCanvasPoint(p.x,p.y);
-  if(!c)return;
-  const hex=rgbToHex(c).toUpperCase();
-  try{
-    await navigator.clipboard.writeText(hex);
-    copyStatus.textContent=`Copied ${hex}`;
-  }catch(err){
-    // Clipboard permissions can be unavailable for file:// documents.
-    previewText.innerHTML+=`<br><b>Select manually: ${hex}</b>`;
-    copyStatus.textContent="Clipboard unavailable";
+  if(dragKnob) {
+    canvas.releasePointerCapture(e.pointerId);
+    dragKnob=null;
+    canvas.style.cursor="crosshair";
+    if(movedDuringDrag) {
+      suppressClick=true;
+      setTimeout(()=>suppressClick=false,0);
+    }
   }
+});
+canvas.addEventListener("pointercancel",()=>{
+  draggingPathKnob=false;
+  dragKnob=null;
+  canvas.style.cursor="crosshair";
+});
+
+canvas.addEventListener("click",async e=>{
+  if(suppressClick)return;
+  const p=canvasPoint(e),c=wheelColorAt(p.x,p.y);
+  if(!c)return;
+  const hex=rgbToHex(c.rgb).toUpperCase();
+  showPreview(c);
+  const ok=await copyText(hex);
+  previewHint.textContent=ok ? "✓ Copied to clipboard" : "Copy blocked — select the HEX above";
+  previewHint.classList.toggle("copied",ok);
+  setTimeout(()=>{previewHint.textContent="Click to copy HEX";previewHint.classList.remove("copied")},1200);
+});
+
+startColor.addEventListener("input",()=>{
+  startHex.value=startColor.value;draw();
+});
+endColor.addEventListener("input",()=>{
+  endHex.value=endColor.value;draw();
+});
+startHex.addEventListener("change",()=>{
+  const c=hexToRgb(startHex.value);
+  if(c){startColor.value=rgbToHex(c);startHex.value=startColor.value;draw()}
+  else startHex.value=startColor.value;
+});
+endHex.addEventListener("change",()=>{
+  const c=hexToRgb(endHex.value);
+  if(c){endColor.value=rgbToHex(c);endHex.value=endColor.value;draw()}
+  else endHex.value=endColor.value;
+});
+samples.addEventListener("input",()=>{
+  samplesValue.textContent=samples.value;draw();
+});
+
+centerBrightness.addEventListener("input",()=>{
+  centerBrightnessValue.textContent=centerBrightness.value;
+  draw();
+});
+document.getElementById("swap").addEventListener("click",()=>{
+  const x=startColor.value;
+  startColor.value=endColor.value;endColor.value=x;
+  startHex.value=startColor.value;endHex.value=endColor.value;
+  draw();
+});
+document.getElementById("reset").addEventListener("click",()=>{
+  startColor.value="#ff0000";endColor.value="#0000ff";
+  startHex.value="#ff0000";endHex.value="#0000ff";
+  samples.value=180;samplesValue.textContent="180";
+  centerBrightness.value=50;
+  centerBrightnessValue.textContent="50";
+  bwWheel=false;
+  bwToggle.setAttribute("aria-pressed","false");
+  bwToggle.textContent="Black & White Wheel: OFF";
+  modeDescription.textContent="Cyan + yellow tends toward green; red + blue tends toward purple.";
+  draw();showPreview(null);
+});
+bwToggle.addEventListener("click",()=>{
+  bwWheel=!bwWheel;
+  bwToggle.setAttribute("aria-pressed",String(bwWheel));
+  bwToggle.textContent=`Black & White Wheel: ${bwWheel?"ON":"OFF"}`;
+  draw();
 });
 
 new ResizeObserver(draw).observe(canvas);
