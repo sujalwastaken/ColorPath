@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3D HSV Gradient Path & CSP Picker</title>
+<title>3D HSV Gradient Path</title>
 <style>
   *{box-sizing:border-box}
   body{
@@ -31,8 +31,6 @@
   }
   button:hover{background:#343434}
   
-  .colorBox{display:grid;grid-template-columns:48px 1fr;gap:7px;align-items:center}
-  .actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:14px}
   .info{
     font-size:12px;color:#aaa;line-height:1.5;padding:10px;background:#151515;
     border:1px solid #303030;border-radius:7px;margin-top:12px
@@ -58,7 +56,6 @@
     pointer-events:none
   }
   .chip{width:42px;height:42px;border-radius:5px;border:1px solid #777}
-  .hex{font-weight:700;font-size:14px}
   .meta{font-size:11px;color:#aaa;margin-top:2px}
   .viewWrap{position:relative}
   .toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:#bbb;margin-top:12px;cursor:pointer}
@@ -123,7 +120,7 @@
       
       <div class="info">
         <b>Navigation:</b> drag empty cone space = orbit · wheel = zoom · double-click = reset.<br>
-        <b>Colors:</b> Click Start/End points to select them, then edit via the CSP picker. Click hover previews on the path or gradient strip to copy hex codes.
+        <b>Colors:</b> Click Start/End points to select them, then edit via the CSP picker or type a hex code directly. Click hover previews on the path or gradient strip to copy hex codes.
       </div>
     </section>
 
@@ -136,7 +133,7 @@
       <div class="readout" style="margin-top:0">
         <div id="chip" class="chip"></div>
         <div>
-          <div id="hex" class="hex">Start Node</div>
+          <input id="hexInput" type="text" value="#181818" spellcheck="false" style="background:transparent; border:none; color:#eee; font-weight:700; font-size:14px; width:100%; outline:none; padding:0;" />
           <div id="meta" class="meta">H — · S — · V —</div>
           <div style="font-size:11px; color:#777; margin-top:2px;" id="nodeLabel">Selected Node</div>
         </div>
@@ -166,7 +163,7 @@
       <label>Samples: <span id="samplesLabel">180</span></label>
       <input id="samples" type="range" min="20" max="500" value="180">
 
-      <div class="actions">
+      <div class="actions" style="margin-top:14px;">
         <button id="swap" type="button">Swap Colors</button>
         <button id="reset" type="button">Reset</button>
         <button id="fit" type="button">Fit View</button>
@@ -310,9 +307,7 @@ function rebuildPath(){
     hexes.push(rgbToHex(rgb));
   }
   
-  // Prevent out-of-bounds selection index when samples scale down
   selectedIndex = Math.min(selectedIndex, path.length - 1);
-
   $("gradientPreview").style.background = `linear-gradient(to right, ${hexes.join(", ")})`;
   
   if (!pickerDrag) {
@@ -393,12 +388,13 @@ function drawArrays(mode,verts,cols,alpha,size){
   upload(verts,cols); gl.uniform1f(uAlpha,alpha); gl.uniform1f(uPointSize,size);
   gl.drawArrays(mode,0,verts.length/3);
 }
-function conePoint(h,s,v){
-  const ang=h*Math.PI*2;
-  const r=s*v;
-  return [r*Math.cos(ang), r*Math.sin(ang), v];
+function conePoint(h, s, v){
+  // Apply hue offset and invert X to mirror/flip the cone
+  const adjustedH = (h - 0.275 + 1) % 1;
+  const ang = adjustedH * Math.PI * 2;
+  const r = s * v;
+  return [-r*Math.cos(ang), r*Math.sin(ang), v];
 }
-
 function drawCone(){
   if(!$("showCone").checked)return;
   const isGray = $("grayToggle").checked;
@@ -607,7 +603,7 @@ canvas.addEventListener("pointerup",e=>{ activeDrag=null; canvas.classList.remov
 canvas.addEventListener("wheel",e=>{ e.preventDefault(); distance=clamp(distance*Math.exp(e.deltaY*.0009),1.5,10); },{passive:false});
 canvas.addEventListener("dblclick",()=>{ yaw=.75;pitch=.48;distance=3.8; });
 
-/* ---------- CSP Canvas Color Picker ---------- */
+/* ---------- CSP Canvas Color Picker (Oriented like reference image) ---------- */
 const pCanvas = $("cspPicker");
 const pCtx = pCanvas.getContext("2d");
 let pickerH = 0, pickerS = 0, pickerV = 0;
@@ -629,7 +625,10 @@ function syncPickerToNode() {
 function updateReadout(){
   const q=path[selectedIndex]; if(!q)return;
   const hex = rgbToHex(q.rgb);
-  $("chip").style.background=hex; $("hex").textContent=hex;
+  $("chip").style.background=hex; 
+  if(document.activeElement !== $("hexInput")) {
+    $("hexInput").value = hex;
+  }
   
   const dispH = (selectedIndex === 0) ? startNodeHSV.h : endNodeHSV.h;
   const dispS = (selectedIndex === 0) ? startNodeHSV.s : endNodeHSV.s;
@@ -653,7 +652,9 @@ function drawPicker() {
       const idx = (y*w + x)*4, dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy);
       if(dist >= rIn && dist <= rOut) {
         let angle = Math.atan2(dy, dx); if(angle < 0) angle += Math.PI*2;
-        const rgb = hsvToRgb(angle/(Math.PI*2), 1, 1);
+        // Offset angle so Green is on the right matching reference image[cite: 2]
+        let hue = (angle / (Math.PI*2) + 0.410) % 1;
+        const rgb = hsvToRgb(hue, 1, 1);
         data[idx] = rgb.r*255; data[idx+1] = rgb.g*255; data[idx+2] = rgb.b*255; data[idx+3] = 255;
       } else if (x >= tx1 && x <= tx3 && y >= ty1 - (x-tx1) && y <= ty2 + (x-tx1)) {
         const w1 = ((ty2-ty3)*(x-tx3) + (tx3-tx2)*(y-ty3)) / denom;
@@ -669,9 +670,12 @@ function drawPicker() {
   }
   pCtx.putImageData(imgData, 0, 0);
 
-  const ha = pickerH * Math.PI*2, hx = cx + Math.cos(ha)*(rIn+rOut)/2, hy = cy + Math.sin(ha)*(rIn+rOut)/2;
+  // Hue ring handle position with reference orientation offset
+  const ha = ((pickerH - 0.410 + 1) % 1) * Math.PI*2;
+  const hx = cx + Math.cos(ha)*(rIn+rOut)/2, hy = cy + Math.sin(ha)*(rIn+rOut)/2;
   pCtx.beginPath(); pCtx.arc(hx, hy, 5, 0, Math.PI*2); pCtx.fillStyle = "#fff"; pCtx.fill(); pCtx.stroke();
 
+  // Triangle handle
   const W1 = pickerV * (1 - pickerS), W2 = 1 - pickerV, W3 = pickerV * pickerS;
   const px = W1*tx1 + W2*tx2 + W3*tx3, py = W1*ty1 + W2*ty2 + W3*ty3;
   pCtx.beginPath(); pCtx.arc(px, py, 6, 0, Math.PI*2);
@@ -688,7 +692,7 @@ function updatePickerFromPointer(e) {
 
   if(pickerDrag === 'ring') {
     let angle = Math.atan2(y - cy, x - cx); if(angle < 0) angle += Math.PI*2;
-    pickerH = angle / (Math.PI*2);
+    pickerH = (angle / (Math.PI*2) + 0.410) % 1;
   } else {
     const tx1 = cx-35, ty1 = cy-50, tx2 = cx-35, ty2 = cy+50, tx3 = cx+50, ty3 = cy;
     let px = Math.max(tx1, Math.min(tx3, x));
@@ -714,6 +718,23 @@ function updatePickerFromPointer(e) {
 pCanvas.addEventListener('pointerdown', e => { pCanvas.setPointerCapture(e.pointerId); pickerDrag=null; updatePickerFromPointer(e); });
 pCanvas.addEventListener('pointermove', e => { if(pickerDrag) updatePickerFromPointer(e); });
 pCanvas.addEventListener('pointerup', () => pickerDrag=null);
+
+/* ---------- Editable Hex Input ---------- */
+$("hexInput").addEventListener("change", (e) => {
+  const rgb = hexToRgb(e.target.value);
+  if(rgb) {
+    const hsv = rgbToHsv(rgb);
+    if(selectedIndex === 0) {
+      startNodeHSV = hsv;
+    } else {
+      endNodeHSV = hsv;
+    }
+    rebuildPath();
+  } else {
+    // Revert to current node hex if invalid
+    updateReadout();
+  }
+});
 
 /* ---------- Gradient Strip Hover & Copy ---------- */
 const gradPrev = $("gradientPreview"), gradHover = $("gradHover");
