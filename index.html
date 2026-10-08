@@ -76,9 +76,11 @@
   .gradient-header{
     display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
   }
-  .gradient-header label{
+  .gradient-header > label{
     margin:0; font-size:13px; font-weight:600; color:#eee;
   }
+  .gradient-actions{display:flex; align-items:center; gap:10px}
+  .gradient-actions .toggle{margin:0; font-size:11px; font-weight:400; color:#bbb; gap:5px}
   #copyGradientBtn{
     height:24px; font-size:11px; padding:0 8px;
   }
@@ -142,7 +144,10 @@
       <div class="gradient-wrap">
         <div class="gradient-header">
           <label>Gradient Strip</label>
-          <button id="copyGradientBtn" type="button">Copy Array</button>
+          <div class="gradient-actions">
+            <label class="toggle"><input id="stripGray" type="checkbox"> Grayscale</label>
+            <button id="copyGradientBtn" type="button">Copy Array</button>
+          </div>
         </div>
         <div style="position:relative;">
           <div id="gradientPreview"></div>
@@ -276,6 +281,17 @@ let hoverIndex=-1;
 let startNodeHSV = rgbToHsv(hexToRgb("#181818"));
 let endNodeHSV = rgbToHsv(hexToRgb("#F2F2F2"));
 
+/* Grayscale helpers for the Gradient Strip (same luma weights as the cone) */
+function grayHex(c){
+  const l = 0.299*c.r + 0.587*c.g + 0.114*c.b;
+  return rgbToHex({r:l, g:l, b:l});
+}
+function updateStripPreview(){
+  const gray = $("stripGray").checked;
+  const cols = path.map(q => gray ? grayHex(q.rgb) : rgbToHex(q.rgb));
+  $("gradientPreview").style.background = `linear-gradient(to right, ${cols.join(", ")})`;
+}
+
 function rebuildPath(){
   const a = hsvToRgb(startNodeHSV.h, startNodeHSV.s, startNodeHSV.v);
   const b = hsvToRgb(endNodeHSV.h, endNodeHSV.s, endNodeHSV.v);
@@ -283,7 +299,6 @@ function rebuildPath(){
   const n = Number($("samples").value);
   const mode = $("mode").value;
   path=[];
-  const hexes = [];
   
   for(let i=0;i<n;i++){
     const t=i/(n-1);
@@ -304,11 +319,10 @@ function rebuildPath(){
     
     const hsv = rgbToHsv(rgb);
     path.push({t, rgb, hsv});
-    hexes.push(rgbToHex(rgb));
   }
   
   selectedIndex = Math.min(selectedIndex, path.length - 1);
-  $("gradientPreview").style.background = `linear-gradient(to right, ${hexes.join(", ")})`;
+  updateStripPreview();
   
   if (!pickerDrag) {
     syncPickerToNode();
@@ -652,7 +666,7 @@ function drawPicker() {
       const idx = (y*w + x)*4, dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy);
       if(dist >= rIn && dist <= rOut) {
         let angle = Math.atan2(dy, dx); if(angle < 0) angle += Math.PI*2;
-        // Offset angle so Green is on the right matching reference image[cite: 2]
+        // Offset angle so Green is on the right matching reference image
         let hue = (angle / (Math.PI*2) + 0.410) % 1;
         const rgb = hsvToRgb(hue, 1, 1);
         data[idx] = rgb.r*255; data[idx+1] = rgb.g*255; data[idx+2] = rgb.b*255; data[idx+3] = 255;
@@ -775,6 +789,7 @@ $("copyGradientBtn").addEventListener("click", (e) => {
 });
 
 /* ---------- Main Listeners ---------- */
+$("stripGray").addEventListener("change", updateStripPreview);
 $("mode").addEventListener("change", rebuildPath);
 $("samples").addEventListener("input",()=>{ $("samplesLabel").textContent=$("samples").value; rebuildPath(); });
 $("swap").addEventListener("click",()=>{
