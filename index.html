@@ -93,6 +93,17 @@
     transform:translateX(-50%); z-index:10; white-space:nowrap; color:#eee;
   }
 
+  .walkLabel{font-size:11px;color:#aaa;margin-top:12px}
+  .walk{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .walk input[type=range]{flex:1;width:auto;min-width:0;height:24px}
+  #walkPlay{height:24px;width:30px;padding:0;font-size:11px}
+  .walkChip{width:20px;height:20px;border-radius:4px;border:1px solid #777;flex:none}
+  .walkHex{font-size:11px;font-weight:700;width:62px;text-align:left;cursor:pointer;flex:none}
+  .walkMarker{
+    position:absolute;top:-4px;bottom:-4px;width:2px;background:#fff;box-shadow:0 0 0 1px #000;
+    display:none;pointer-events:none;transform:translateX(-1px);z-index:9
+  }
+
   @media(max-width:900px){
     .layout{grid-template-columns:1fr}
     #view{height:65vh;min-height:430px}
@@ -122,7 +133,8 @@
       
       <div class="info">
         <b>Navigation:</b> drag empty cone space = orbit · wheel = zoom · double-click = reset.<br>
-        <b>Colors:</b> Click Start/End points to select them, then edit via the CSP picker or type a hex code directly. Click hover previews on the path or gradient strip to copy hex codes.
+        <b>Colors:</b> Click Start/End points to select them, then edit via the CSP picker or type a hex code directly. Click hover previews on the path or gradient strip to copy hex codes.<br>
+        <b>Walk:</b> scrub or play the slider under the gradient strip to move a marker along the path and read the color at that point.
       </div>
     </section>
 
@@ -130,12 +142,13 @@
       <div class="picker-container">
         <canvas id="cspPicker" width="220" height="220"></canvas>
         <div style="font-size:11px; color:#aaa; margin-top:10px;">Select a node in 3D to edit its color</div>
+        <label class="toggle" style="margin-top:8px;"><input id="pickerGray" type="checkbox"> Grayscale color wheel</label>
       </div>
 
       <div class="readout" style="margin-top:0">
         <div id="chip" class="chip"></div>
         <div>
-          <input id="hexInput" type="text" value="#181818" spellcheck="false" style="background:transparent; border:none; color:#eee; font-weight:700; font-size:14px; width:100%; outline:none; padding:0;" />
+          <input id="hexInput" type="text" value="#000000" spellcheck="false" style="background:transparent; border:none; color:#eee; font-weight:700; font-size:14px; width:100%; outline:none; padding:0;" />
           <div id="meta" class="meta">H — · S — · V —</div>
           <div style="font-size:11px; color:#777; margin-top:2px;" id="nodeLabel">Selected Node</div>
         </div>
@@ -151,7 +164,15 @@
         </div>
         <div style="position:relative;">
           <div id="gradientPreview"></div>
+          <div id="walkMarker" class="walkMarker"></div>
           <div id="gradHover"></div>
+        </div>
+        <div class="walkLabel">Preview walk along path</div>
+        <div class="walk">
+          <button id="walkPlay" type="button" title="Play / pause">&#10074;&#10074;</button>
+          <input id="walkT" type="range" min="0" max="1000" value="0">
+          <div id="walkChip" class="walkChip"></div>
+          <span id="walkHex" class="walkHex" title="Click to copy">#000000</span>
         </div>
       </div>
 
@@ -177,6 +198,8 @@
       <label class="toggle"><input id="showCone" type="checkbox" checked> Show colored double cone</label>
       <label class="toggle"><input id="showGrid" type="checkbox" checked> Show guide grid</label>
       <label class="toggle"><input id="grayToggle" type="checkbox"> Grayscale cone (Keep path colored)</label>
+      <label class="toggle"><input id="hueBright" type="checkbox" checked> Hues at brightness height (off = perfect cone &amp; triangle)</label>
+      <label class="toggle"><input id="autoRotate" type="checkbox" checked> Auto-rotate when idle</label>
     </aside>
   </div>
 </div>
@@ -220,33 +243,6 @@ function hsvToRgb(h,s,v){
     case 0:return {r:v,g:t,b:p}; case 1:return {r:q,g:v,b:p}; case 2:return {r:p,g:v,b:t};
     case 3:return {r:p,g:q,b:v}; case 4:return {r:t,g:p,b:v}; default:return {r:v,g:p,b:q};
   }
-}
-
-/* HSL helpers (used to place colors inside the double cone) */
-function rgbToHsl(c){
-  const max=Math.max(c.r,c.g,c.b), min=Math.min(c.r,c.g,c.b), d=max-min;
-  const l=(max+min)/2;
-  let h=0;
-  if(d){
-    if(max===c.r) h=((c.g-c.b)/d)%6;
-    else if(max===c.g) h=(c.b-c.r)/d+2;
-    else h=(c.r-c.g)/d+4;
-    h/=6; if(h<0)h+=1;
-  }
-  const den=1-Math.abs(2*l-1);
-  return {h, s:den>1e-6?clamp(d/den):0, l};
-}
-function hslToRgb(h,s,l){
-  h=((h%1)+1)%1; s=clamp(s); l=clamp(l);
-  const c=(1-Math.abs(2*l-1))*s;
-  const x=c*(1-Math.abs((h*6)%2-1));
-  const m=l-c/2;
-  let r=0,g=0,b=0;
-  switch(Math.floor(h*6)%6){
-    case 0:r=c;g=x;break; case 1:r=x;g=c;break; case 2:g=c;b=x;break;
-    case 3:g=x;b=c;break; case 4:r=x;b=c;break; default:r=c;b=x;
-  }
-  return {r:r+m,g:g+m,b:b+m};
 }
 
 /* Color Mixing logic */
@@ -305,8 +301,16 @@ let path=[];
 let selectedIndex=0;
 let hoverIndex=-1;
 
-let startNodeHSV = rgbToHsv(hexToRgb("#181818"));
-let endNodeHSV = rgbToHsv(hexToRgb("#F2F2F2"));
+/* Preview walk: a marker that slides along the path (independent of the selected start/end node) */
+let walkScrub=false;
+let walkT=0, walkActive=true, walkPlaying=true, walkDir=1, walkLast=performance.now();
+let lastInteraction=-Infinity;      // no cooldown at page load: rotation starts right away
+let autoRotating=false;
+let interactHeld=false;            // pointer currently held on the cone / color wheel / preview slider
+const IDLE_COOLDOWN=2000;          // ms to wait after interaction ends before the cone starts spinning again
+
+let startNodeHSV = rgbToHsv(hexToRgb("#000000"));
+let endNodeHSV = rgbToHsv(hexToRgb("#FFFFFF"));
 
 /* Grayscale helpers for the Gradient Strip (same luma weights as the cone) */
 function grayHex(c){
@@ -345,12 +349,12 @@ function rebuildPath(){
     }
     
     const hsv = rgbToHsv(rgb);
-    const hsl = rgbToHsl(rgb);
-    path.push({t, rgb, hsv, hsl});
+    path.push({t, rgb, hsv});
   }
   
-  selectedIndex = Math.min(selectedIndex, path.length - 1);
+  selectedIndex = selectedIndex === 0 ? 0 : path.length - 1;   // selection is always the start or end node
   updateStripPreview();
+  updateWalkUI();
   
   if (!pickerDrag) {
     syncPickerToNode();
@@ -407,7 +411,33 @@ function transformPoint(m,p){
 }
 
 const CONE_H = 1.7;              // vertical stretch of the double cone (taller = less flat)
-let yaw=.75,pitch=.48,distance=5;
+const DEFAULT_YAW = .75;
+let yaw=DEFAULT_YAW,pitch=.48,distance=5;
+
+/* Hue orientation: blue (240deg) sits at the bottom of both hue wheels.
+   - 2D picker ring: bottom of the ring is canvas angle PI/2.
+   - 3D cone: the side facing the camera in the default view (the bottom of the wheel on screen). */
+const HUE_BLUE = 2/3;
+const PICKER_HUE_OFF = HUE_BLUE - 0.25;
+const BLUE_WORLD_ANGLE = Math.PI/2 + DEFAULT_YAW;
+const CONE_HUE_OFF = HUE_BLUE - BLUE_WORLD_ANGLE/(Math.PI*2);
+
+/* Brightness (luma) of each fully saturated hue: where that pure hue sits between black (0) and white (1) */
+const HUE_LUMA_N = 720;
+const HUE_LUMA = new Float32Array(HUE_LUMA_N+1);
+for(let i=0;i<=HUE_LUMA_N;i++){
+  const c=hsvToRgb(i/HUE_LUMA_N,1,1);
+  HUE_LUMA[i]=0.299*c.r+0.587*c.g+0.114*c.b;
+}
+const hueBrightEl = $("hueBright");
+function hueLuma(h){
+  if(!hueBrightEl.checked) return 0.5;   // flat: perfect double cone / symmetric triangle
+  h=((h%1)+1)%1;
+  const f=h*HUE_LUMA_N, i=Math.min(HUE_LUMA_N-1,Math.floor(f));
+  return lerp(HUE_LUMA[i],HUE_LUMA[i+1],f-i);
+}
+// Vertical position of the pure-hue corner of the picker triangle (white = top, black = bottom)
+function triHueY(cy,h){ return (cy+50) - 100*hueLuma(h); }
 let userZoomed=false;
 
 // Pick a camera distance so the whole double cone fits the current viewport
@@ -443,48 +473,54 @@ function drawArrays(mode,verts,cols,alpha,size){
   gl.drawArrays(mode,0,verts.length/3);
 }
 
-/* Double cone: height = lightness (0 black tip, 0.5 gray/pure-hue equator, 1 white tip),
-   radius = saturation scaled by how wide the cone is at that height. */
-function conePoint(h, s, l){
-  // Apply hue offset and invert X to mirror/flip the cone
-  const adjustedH = (h - 0.275 + 1) % 1;
-  const ang = adjustedH * Math.PI * 2;
-  const r = s * (1 - Math.abs(2*l - 1));
-  return [-r*Math.cos(ang), r*Math.sin(ang), l*CONE_H];
+/* Each hue slice is the HSV triangle: white at the top of the axis, black at the bottom,
+   and the pure hue at its own brightness height (blue low, yellow high) instead of a flat equator. */
+function conePoint(h, s, v){
+  const ang = (h - CONE_HUE_OFF) * Math.PI * 2;
+  const r = s * v;                              // distance from the gray axis
+  const z = v*(1-s) + v*s*hueLuma(h);           // barycentric: white=1, black=0, hue corner=its luma
+  return [-r*Math.cos(ang), r*Math.sin(ang), z*CONE_H];
 }
-function pathPoint(q){ return conePoint(q.hsl.h, q.hsl.s, q.hsl.l); }
+function pathPoint(q){ return conePoint(q.hsv.h, q.hsv.s, q.hsv.v); }
 
+let coneCache=null, coneCacheGray=null;
 function drawCone(){
   if(!$("showCone").checked)return;
   const isGray = $("grayToggle").checked;
-  const verts=[],cols=[];
-  const rings=20,seg=96;
 
-  const toColor = (c) => {
-    const lift = x => 0.12 + 0.88 * x;
-    if(!isGray) return [lift(c.r), lift(c.g), lift(c.b)];
-    const l = lift(0.299*c.r + 0.587*c.g + 0.114*c.b);
-    return [l, l, l];
-  };
+  const coneKey = isGray + "|" + hueBrightEl.checked;
+  if(!coneCache || coneCacheGray!==coneKey){
+    const verts=[],cols=[];
+    const rings=18,seg=96;
 
-  for(let j=1;j<rings;j++){
-    const L=j/rings;
-    for(let i=0;i<seg;i++){
-      const h0=i/seg,h1=(i+1)/seg;
-      for(let k=0;k<10;k++){
-        const s0=k/10,s1=(k+1)/10;
-        const q0=conePoint(h0,s0,L),q1=conePoint(h1,s0,L);
-        const q2=conePoint(h1,s1,L),q3=conePoint(h0,s1,L);
-        const a=hslToRgb(h0,s0,L),b=hslToRgb(h1,s0,L),c=hslToRgb(h1,s1,L),d=hslToRgb(h0,s1,L);
-        
-        verts.push(...q0,...q1,...q2,...q0,...q2,...q3);
-        cols.push(...toColor(a), ...toColor(b), ...toColor(c), ...toColor(a), ...toColor(c), ...toColor(d));
+    const toColor = (c) => {
+      const lift = x => 0.12 + 0.88 * x;
+      if(!isGray) return [lift(c.r), lift(c.g), lift(c.b)];
+      const l = lift(0.299*c.r + 0.587*c.g + 0.114*c.b);
+      return [l, l, l];
+    };
+
+    for(let j=1;j<=rings;j++){
+      const v=j/rings;
+      for(let i=0;i<seg;i++){
+        const h0=i/seg,h1=(i+1)/seg;
+        for(let k=0;k<10;k++){
+          const s0=k/10,s1=(k+1)/10;
+          const q0=conePoint(h0,s0,v),q1=conePoint(h1,s0,v);
+          const q2=conePoint(h1,s1,v),q3=conePoint(h0,s1,v);
+          const a=hsvToRgb(h0,s0,v),b=hsvToRgb(h1,s0,v),c=hsvToRgb(h1,s1,v),d=hsvToRgb(h0,s1,v);
+
+          verts.push(...q0,...q1,...q2,...q0,...q2,...q3);
+          cols.push(...toColor(a), ...toColor(b), ...toColor(c), ...toColor(a), ...toColor(c), ...toColor(d));
+        }
       }
     }
+    coneCache={verts:new Float32Array(verts), cols:new Float32Array(cols)};
+    coneCacheGray=coneKey;
   }
 
   gl.disable(gl.CULL_FACE); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-  drawArrays(gl.TRIANGLES,verts,cols,.27,1);
+  drawArrays(gl.TRIANGLES,coneCache.verts,coneCache.cols,.27,1);
 }
 
 function drawGrid(){
@@ -492,17 +528,17 @@ function drawGrid(){
   const isGray = $("grayToggle").checked;
   const verts=[],cols=[];
   const col = isGray ? [.15,.15,.15] : [.34,.34,.34];
-  // Hue edge lines: black tip -> equator -> white tip
+  // Hue edge lines: black -> pure hue -> white
   for(let i=0;i<12;i++){
     const h=i/12;
-    verts.push(...conePoint(h,1,0),...conePoint(h,1,.5)); cols.push(...col,...col);
-    verts.push(...conePoint(h,1,.5),...conePoint(h,1,1)); cols.push(...col,...col);
+    verts.push(...conePoint(h,1,0),...conePoint(h,1,1)); cols.push(...col,...col);
+    verts.push(...conePoint(h,1,1),...conePoint(h,0,1)); cols.push(...col,...col);
   }
-  // Lightness rings (includes the equator at L = 0.5)
-  for(let j=1;j<=9;j++){
-    const L=j/10;
+  // Rings of constant value on the saturated surface (v = 1 is the wavy pure-hue ring)
+  for(let j=1;j<=5;j++){
+    const v=j/5;
     for(let i=0;i<96;i++){
-      verts.push(...conePoint(i/96,1,L),...conePoint((i+1)/96,1,L)); cols.push(...col,...col);
+      verts.push(...conePoint(i/96,1,v),...conePoint((i+1)/96,1,v)); cols.push(...col,...col);
     }
   }
   drawArrays(gl.LINES,verts,cols,.28,1);
@@ -538,17 +574,74 @@ function drawSelected(){
   gl.enable(gl.DEPTH_TEST);
 }
 
+function walkIndex(){ return Math.round(walkT*(path.length-1)); }
+function drawWalk(){
+  if(!walkActive || !path.length) return;
+  const q=path[walkIndex()];
+  const p=pathPoint(q);
+  gl.disable(gl.DEPTH_TEST);
+  drawArrays(gl.POINTS,p,[1,1,1],1,26);
+  drawArrays(gl.POINTS,p,[0,0,0],1,20);
+  drawArrays(gl.POINTS,p,[q.rgb.r,q.rgb.g,q.rgb.b],1,14);
+  gl.enable(gl.DEPTH_TEST);
+}
+// Drive the color wheel (ring handle + triangle) from the walker
+function applyWalkToPicker(){
+  if(!walkActive || !path.length || pickerDrag) return;
+  const w=path[walkIndex()].hsv;
+  pickerH=w.h; pickerS=w.s; pickerV=w.v;
+  drawPicker();
+}
+// Stop previewing so the picker goes back to editing the selected node
+function stopWalk(){
+  if(!walkActive && !walkPlaying) return;
+  walkActive=false; walkPlaying=false;
+  $("walkPlay").innerHTML="&#9654;";
+  updateWalkUI();
+  syncPickerToNode();
+}
+function updateWalkUI(){
+  if(!path.length) return;
+  const hex=rgbToHex(path[walkIndex()].rgb);
+  $("walkChip").style.background=hex;
+  $("walkHex").textContent=hex;
+  $("walkHex").style.color="";
+  const m=$("walkMarker");
+  m.style.display=walkActive?"block":"none";
+  m.style.left=(walkT*100)+"%";
+  applyWalkToPicker();
+}
+function stepWalk(){
+  const now=performance.now();
+  const dt=Math.min(now-walkLast,100);            // ms, clamped so tab-switches don't jump
+  walkLast=now;
+  if(walkPlaying && !walkScrub){
+    walkT+=walkDir*dt/4000;                       // ~4 s per pass, ping-pong
+    if(walkT>=1){walkT=1;walkDir=-1}
+    else if(walkT<=0){walkT=0;walkDir=1}
+    $("walkT").value=Math.round(walkT*1000);
+    updateWalkUI();
+  }
+  // Spin the cone only while the cone, color wheel and preview slider are not being used (with a cooldown after use)
+  autoRotating = $("autoRotate").checked && !activeDrag && !interactHeld && now-lastInteraction>IDLE_COOLDOWN;
+  if(autoRotating){
+    yaw+=dt*0.00025;                              // ~0.25 rad/s
+    if(hoverIndex>=0){ hoverIndex=-1; $("hoverPreview").style.display="none"; }
+  }
+}
+
 function resize(){
   const d=Math.min(devicePixelRatio||1,2);
   const r=canvas.getBoundingClientRect(), w=Math.max(1,Math.round(r.width*d)), h=Math.max(1,Math.round(r.height*d));
   if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; if(!userZoomed) fitView(); }
 }
 function render(){
+  stepWalk();
   resize();
   gl.viewport(0,0,canvas.width,canvas.height); gl.clearColor(.025,.025,.025,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   gl.useProgram(prog); gl.uniformMatrix4fv(uMVP,false,mvp());
   gl.enable(gl.DEPTH_TEST);
-  drawCone(); drawGrid(); drawPath(); drawSelected();
+  drawCone(); drawGrid(); drawPath(); drawSelected(); drawWalk();
   requestAnimationFrame(render);
 }
 
@@ -602,6 +695,7 @@ function pointerPos(e){
 }
 
 function setHoverFromPointer(e){
+  if(autoRotating){ hoverIndex=-1; $("hoverPreview").style.display="none"; return; }
   const [x,y]=pointerPos(e);
   const n=nearestPath(x,y);
   const hp=$("hoverPreview"), hHex=$("hoverHex"), hMeta=$("hoverMeta"), hChip=$("hoverChip");
@@ -663,7 +757,7 @@ canvas.addEventListener("pointermove",e=>{
 });
 canvas.addEventListener("pointerup",e=>{ activeDrag=null; canvas.classList.remove("dragging"); setHoverFromPointer(e); });
 canvas.addEventListener("wheel",e=>{ e.preventDefault(); userZoomed=true; distance=clamp(distance*Math.exp(e.deltaY*.0009),1.5,10); },{passive:false});
-canvas.addEventListener("dblclick",()=>{ yaw=.75;pitch=.48;userZoomed=false;fitView(); });
+canvas.addEventListener("dblclick",()=>{ yaw=DEFAULT_YAW;pitch=.48;userZoomed=false;fitView(); });
 
 /* ---------- CSP Canvas Color Picker (Oriented like reference image) ---------- */
 const pCanvas = $("cspPicker");
@@ -671,7 +765,7 @@ const pCtx = pCanvas.getContext("2d");
 let pickerH = 0, pickerS = 0, pickerV = 0;
 let pickerDrag = null;
 
-function syncPickerToNode() {
+function syncPickerToNode(forceNode) {
   if(!path.length) return;
   const q = path[selectedIndex];
   if(selectedIndex === 0 && startNodeHSV) {
@@ -681,6 +775,7 @@ function syncPickerToNode() {
   } else if (q) {
     pickerH = q.hsv.h; pickerS = q.hsv.s; pickerV = q.hsv.v;
   }
+  if(walkActive && !forceNode){ const w=path[walkIndex()].hsv; pickerH=w.h; pickerS=w.s; pickerV=w.v; }
   updateReadout(); drawPicker();
 }
 
@@ -700,13 +795,24 @@ function updateReadout(){
   $("nodeLabel").textContent = selectedIndex === 0 ? "Selected: Start Node" : "Selected: End Node";
 }
 
+function putPx(data, idx, rgb, gray){
+  if(gray){
+    const l = (0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b) * 255;
+    data[idx] = l; data[idx+1] = l; data[idx+2] = l;
+  } else {
+    data[idx] = rgb.r*255; data[idx+1] = rgb.g*255; data[idx+2] = rgb.b*255;
+  }
+  data[idx+3] = 255;
+}
+
 function drawPicker() {
   const w = pCanvas.width, h = pCanvas.height;
   const imgData = pCtx.createImageData(w, h);
   const data = imgData.data;
+  const pgray = $("pickerGray").checked;
   const cx = w/2, cy = h/2, rOut = 105, rIn = 80;
   
-  const tx1 = cx-35, ty1 = cy-50, tx2 = cx-35, ty2 = cy+50, tx3 = cx+50, ty3 = cy;
+  const tx1 = cx-35, ty1 = cy-50, tx2 = cx-35, ty2 = cy+50, tx3 = cx+50, ty3 = triHueY(cy, pickerH);
   const denom = (ty2-ty3)*(tx1-tx3) + (tx3-tx2)*(ty1-ty3);
 
   for(let y=0; y<h; y++) {
@@ -714,18 +820,18 @@ function drawPicker() {
       const idx = (y*w + x)*4, dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy);
       if(dist >= rIn && dist <= rOut) {
         let angle = Math.atan2(dy, dx); if(angle < 0) angle += Math.PI*2;
-        // Offset angle so Green is on the right matching reference image
-        let hue = (angle / (Math.PI*2) + 0.410) % 1;
+        // Offset angle so blue sits exactly at the bottom of the ring
+        let hue = (angle / (Math.PI*2) + PICKER_HUE_OFF) % 1;
         const rgb = hsvToRgb(hue, 1, 1);
-        data[idx] = rgb.r*255; data[idx+1] = rgb.g*255; data[idx+2] = rgb.b*255; data[idx+3] = 255;
-      } else if (x >= tx1 && x <= tx3 && y >= ty1 - (x-tx1) && y <= ty2 + (x-tx1)) {
+        putPx(data, idx, rgb, pgray);
+      } else if (x >= tx1 && x <= tx3) {
         const w1 = ((ty2-ty3)*(x-tx3) + (tx3-tx2)*(y-ty3)) / denom;
         const w2 = ((ty3-ty1)*(x-tx3) + (tx1-tx3)*(y-ty3)) / denom;
         const w3 = 1 - w1 - w2;
         if(w1 >= -0.01 && w2 >= -0.01 && w3 >= -0.01) {
           const v = clamp(w1 + w3), s = v > 0 ? clamp(w3 / v) : 0;
           const rgb = hsvToRgb(pickerH, s, v);
-          data[idx] = rgb.r*255; data[idx+1] = rgb.g*255; data[idx+2] = rgb.b*255; data[idx+3] = 255;
+          putPx(data, idx, rgb, pgray);
         }
       }
     }
@@ -733,7 +839,7 @@ function drawPicker() {
   pCtx.putImageData(imgData, 0, 0);
 
   // Hue ring handle position with reference orientation offset
-  const ha = ((pickerH - 0.410 + 1) % 1) * Math.PI*2;
+  const ha = ((pickerH - PICKER_HUE_OFF + 1) % 1) * Math.PI*2;
   const hx = cx + Math.cos(ha)*(rIn+rOut)/2, hy = cy + Math.sin(ha)*(rIn+rOut)/2;
   pCtx.beginPath(); pCtx.arc(hx, hy, 5, 0, Math.PI*2); pCtx.fillStyle = "#fff"; pCtx.fill(); pCtx.stroke();
 
@@ -754,9 +860,9 @@ function updatePickerFromPointer(e) {
 
   if(pickerDrag === 'ring') {
     let angle = Math.atan2(y - cy, x - cx); if(angle < 0) angle += Math.PI*2;
-    pickerH = (angle / (Math.PI*2) + 0.410) % 1;
+    pickerH = (angle / (Math.PI*2) + PICKER_HUE_OFF) % 1;
   } else {
-    const tx1 = cx-35, ty1 = cy-50, tx2 = cx-35, ty2 = cy+50, tx3 = cx+50, ty3 = cy;
+    const tx1 = cx-35, ty1 = cy-50, tx2 = cx-35, ty2 = cy+50, tx3 = cx+50, ty3 = triHueY(cy, pickerH);
     let px = Math.max(tx1, Math.min(tx3, x));
     let t = (px - tx1) / (tx3 - tx1);
     let py = Math.max(ty1 + t*(ty3 - ty1), Math.min(ty2 + t*(ty3 - ty2), y));
@@ -777,9 +883,9 @@ function updatePickerFromPointer(e) {
   rebuildPath();
 }
 
-pCanvas.addEventListener('pointerdown', e => { pCanvas.setPointerCapture(e.pointerId); pickerDrag=null; updatePickerFromPointer(e); });
+pCanvas.addEventListener('pointerdown', e => { pCanvas.setPointerCapture(e.pointerId); pickerDrag=null; syncPickerToNode(true); updatePickerFromPointer(e); });
 pCanvas.addEventListener('pointermove', e => { if(pickerDrag) updatePickerFromPointer(e); });
-pCanvas.addEventListener('pointerup', () => pickerDrag=null);
+pCanvas.addEventListener('pointerup', () => { pickerDrag=null; applyWalkToPicker(); });
 
 /* ---------- Editable Hex Input ---------- */
 $("hexInput").addEventListener("change", (e) => {
@@ -838,18 +944,46 @@ $("copyGradientBtn").addEventListener("click", (e) => {
 
 /* ---------- Main Listeners ---------- */
 $("stripGray").addEventListener("change", updateStripPreview);
+$("pickerGray").addEventListener("change", drawPicker);
+function markInteract(){ lastInteraction = performance.now(); }
+[$("view"), $("cspPicker"), $("walkT"), $("walkPlay")].forEach(el => {
+  el.addEventListener("pointerdown", () => { interactHeld = true; markInteract(); });
+  el.addEventListener("wheel", markInteract, {passive:true});
+});
+$("walkT").addEventListener("input", markInteract);
+["pointerup","pointercancel"].forEach(ev =>
+  document.addEventListener(ev, () => { walkScrub = false; if(interactHeld){ interactHeld = false; markInteract(); } }));
+$("walkT").addEventListener("pointerdown",()=>{ walkScrub=true; });
+$("walkT").addEventListener("input",()=>{
+  walkT=Number($("walkT").value)/1000; walkActive=true; updateWalkUI();
+});
+$("walkPlay").addEventListener("click",()=>{
+  walkPlaying=!walkPlaying; walkActive=true; walkLast=performance.now();
+  $("walkPlay").innerHTML=walkPlaying?"&#10074;&#10074;":"&#9654;";
+  updateWalkUI();
+});
+$("walkHex").addEventListener("click",()=>{
+  if(!path.length) return;
+  const hex=rgbToHex(path[walkIndex()].rgb).replace("#","");
+  navigator.clipboard.writeText(hex);
+  $("walkHex").textContent="Copied"; $("walkHex").style.color="#4f4";
+  setTimeout(updateWalkUI,900);
+});
+$("hueBright").addEventListener("change", drawPicker);
 $("mode").addEventListener("change", rebuildPath);
 $("samples").addEventListener("input",()=>{ $("samplesLabel").textContent=$("samples").value; rebuildPath(); });
 $("swap").addEventListener("click",()=>{
   const temp = startNodeHSV; startNodeHSV = endNodeHSV; endNodeHSV = temp; rebuildPath();
 });
 $("reset").addEventListener("click",()=>{
-  startNodeHSV = rgbToHsv(hexToRgb("#181818"));
-  endNodeHSV = rgbToHsv(hexToRgb("#F2F2F2"));
+  startNodeHSV = rgbToHsv(hexToRgb("#000000"));
+  endNodeHSV = rgbToHsv(hexToRgb("#FFFFFF"));
   $("mode").value="paint"; $("samples").value=180; $("samplesLabel").textContent="180";
+  walkT=0; walkActive=true; walkPlaying=true; walkDir=1; walkLast=performance.now();
+  $("walkT").value=0; $("walkPlay").innerHTML="&#10074;&#10074;";
   selectedIndex=0; rebuildPath();
 });
-$("fit").addEventListener("click",()=>{ yaw=.75;pitch=.48;userZoomed=false;fitView(); });
+$("fit").addEventListener("click",()=>{ yaw=DEFAULT_YAW;pitch=.48;userZoomed=false;fitView(); });
 
 fitView();
 rebuildPath(); render();
